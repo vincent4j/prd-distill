@@ -18,16 +18,16 @@ prd-distill/
 
 ## 推荐安装
 
-一键安装：
+完整安装，包含 Codex / Claude Code skill 和 Claude Code 全局 hooks：
+
+```bash
+tmp="$(mktemp -d)" && git clone --depth=1 https://github.com/vincent4j/prd-distill "$tmp" && python3 "$tmp/scripts/install.py"
+```
+
+只安装 skill 文件：
 
 ```bash
 npx skills add vincent4j/prd-distill
-```
-
-一次安装到所有本地支持的 Agent：
-
-```bash
-npx skills add vincent4j/prd-distill --all
 ```
 
 ## 手动安装
@@ -70,16 +70,10 @@ python3 scripts/install.py --codex --codex-dir ~/.agents/skills
 python3 scripts/install.py --claude
 ```
 
-安装到指定 Claude Code 项目：
+跳过全局 hooks：
 
 ```bash
-python3 scripts/install.py --claude-project /path/to/project
-```
-
-安装 Claude Code 项目 hooks：
-
-```bash
-python3 scripts/install.py --claude-project /path/to/project --install-claude-hooks
+python3 scripts/install.py --claude --no-claude-hooks
 ```
 
 ## 使用方式
@@ -90,11 +84,13 @@ Codex：
 [$prd-distill]
 ```
 
-Codex 没有 Claude Code hook 生命周期。使用 skill 工作流，并在提交前运行确定性检查：
+Codex 没有 Claude Code 的 prompt/tool 生命周期 hooks。使用 skill 工作流，并在提交前运行确定性检查：
 
 ```bash
 python3 ~/.codex/skills/prd-distill/scripts/prd_distill.py check --root <repo>
 ```
+
+Codex 不能在模型收到每条用户消息时自动运行 `UserPromptSubmit` 等价 hook；需求碎片收集由 skill 工作流读取聊天、plans、worklog 和 git diff 完成。
 
 Claude Code：
 
@@ -102,14 +98,14 @@ Claude Code：
 /prd-distill
 ```
 
-安装 hooks 后：
+全局 hooks 安装后：
 
 - `UserPromptSubmit` 会把强需求片段收集到 `docs/prd/inbox/`。
 - `PreToolUse` 会观察 Bash 调用，并在 PRD / 合同 inbox 草稿未处理时阻止 `git commit`。
 
 ## 兼容规则
 
-- hook 脚本必须是可选的，并且只服务于 Claude Code。
+- hook 脚本默认全局安装，并且只服务于 Claude Code。
 - `agents/openai.yaml` 对 Claude Code 必须无害。
 - 核心脚本只使用 Python 标准库。
 - 不要把平台特定假设写进文档模型。

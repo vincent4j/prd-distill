@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import stat
 from pathlib import Path
@@ -77,14 +78,19 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _hook_exists(items: list[dict], command_suffix: str) -> bool:
+def _remove_hook(items: list[dict], command_suffix: str) -> None:
     needle = command_suffix.replace("\\", "/")
     for group in items:
+        kept = []
         for hook in group.get("hooks", []):
             command = str(hook.get("command") or "").replace("\\", "/")
-            if needle in command:
-                return True
-    return False
+            if needle not in command:
+                kept.append(hook)
+        group["hooks"] = kept
+    items[:] = [
+        group for group in items
+        if group.get("hooks")
+    ]
 
 
 def _make_executable(path: Path) -> None:
@@ -92,38 +98,39 @@ def _make_executable(path: Path) -> None:
     path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _install_claude_hooks(project: Path) -> None:
-    project = project.expanduser().resolve()
-    hooks_dir = project / ".claude" / "hooks"
+def _install_claude_hooks(claude_dir: Path) -> Path:
+    claude_dir = claude_dir.expanduser().resolve()
+    hooks_dir = claude_dir / "hooks" / "prd-distill"
     hooks_dir.mkdir(parents=True, exist_ok=True)
     for name in ("harvest_prd_prompt.py", "guard_prd_commit.py"):
         target = hooks_dir / name
         shutil.copy2(SOURCE_SKILL / "scripts" / "claude_hooks" / name, target)
         _make_executable(target)
 
-    settings_path = project / ".claude" / "settings.json"
+    settings_path = claude_dir / "settings.json"
     settings = _load_json(settings_path)
     hooks = settings.setdefault("hooks", {})
     user_prompt = hooks.setdefault("UserPromptSubmit", [])
     pre_tool = hooks.setdefault("PreToolUse", [])
 
-    harvest_command = 'python3 "${CLAUDE_PROJECT_DIR}/.claude/hooks/harvest_prd_prompt.py"'
-    guard_command = 'python3 "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_prd_commit.py"'
+    harvest_command = f"python3 {shlex.quote(str(hooks_dir / 'harvest_prd_prompt.py'))}"
+    guard_command = f"python3 {shlex.quote(str(hooks_dir / 'guard_prd_commit.py'))}"
 
-    if not _hook_exists(user_prompt, "harvest_prd_prompt.py"):
-        user_prompt.append({
-            "hooks": [{"type": "command", "command": harvest_command}]
-        })
-    if not _hook_exists(pre_tool, "guard_prd_commit.py"):
-        pre_tool.append({
-            "matcher": "Bash",
-            "hooks": [{
-                "type": "command",
-                "command": guard_command,
-            }],
-        })
+    _remove_hook(user_prompt, "harvest_prd_prompt.py")
+    _remove_hook(pre_tool, "guard_prd_commit.py")
+    user_prompt.append({
+        "hooks": [{"type": "command", "command": harvest_command}]
+    })
+    pre_tool.append({
+        "matcher": "Bash",
+        "hooks": [{
+            "type": "command",
+            "command": guard_command,
+        }],
+    })
 
     settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return hooks_dir
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -135,8 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--codex-dir", help="指定 Codex skills 目录")
     parser.add_argument("--claude", action="store_true", help="安装到 Claude Code 全局 skills 目录")
     parser.add_argument("--claude-dir", help="指定 Claude Code 全局 skills 目录")
-    parser.add_argument("--claude-project", help="安装到 <project>/.claude/skills")
-    parser.add_argument("--install-claude-hooks", action="store_true", help="把 Claude Code hooks 安装到 --claude-project")
+    parser.add_argument("--no-claude-hooks", action="store_true", help="不安装 Claude Code hooks")
     return parser
 
 
@@ -146,7 +152,6 @@ def main() -> int:
         args.all,
         args.codex,
         args.claude,
-        args.claude_project,
     ))
     detected = {
         "codex": _detect_codex(),
@@ -163,22 +168,15 @@ def main() -> int:
         if not args.codex and not args.claude:
             args.codex = True
             args.claude = True
-    if args.install_claude_hooks and not args.claude_project:
-        raise SystemExit("--install-claude-hooks 需要同时指定 --claude-project")
-
     if args.codex:
         installed.append(str(_copy_skill(Path(args.codex_dir) if args.codex_dir else _default_codex_dir())))
     if args.claude:
         installed.append(str(_copy_skill(Path(args.claude_dir) if args.claude_dir else _default_claude_dir())))
-    if args.claude_project:
-        project = Path(args.claude_project).expanduser().resolve()
-        installed.append(str(_copy_skill(project / ".claude" / "skills")))
-        if args.install_claude_hooks:
-            _install_claude_hooks(project)
-            installed.append(str(project / ".claude" / "hooks"))
+        if not args.no_claude_hooks:
+            installed.append(str(_install_claude_hooks(_home() / ".claude")))
 
     if not installed:
-        raise SystemExit("没有可安装目标；请传入 --codex、--claude 或 --claude-project")
+        raise SystemExit("没有可安装目标；请传入 --codex 或 --claude")
 
     print(json.dumps({
         "mode": "explicit" if explicit else "auto",

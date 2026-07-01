@@ -21,8 +21,8 @@ description: "把聊天里的片段需求、每日 plans、工作日志、代码
 同时支持 Codex 和 Claude Code：
 
 - Codex：安装到 `~/.codex/skills/prd-distill`，或其他 Codex skills 目录，例如 `~/.agents/skills/prd-distill`。
-- Claude Code：安装到 `~/.claude/skills/prd-distill` 或 `<project>/.claude/skills/prd-distill`。
-- Claude Code hooks 是可选自动化；核心流程不能依赖 hooks。
+- Claude Code：安装到 `~/.claude/skills/prd-distill`。
+- Claude Code hooks 由安装器默认安装为全局 hooks，位置是 `~/.claude/settings.json` 和 `~/.claude/hooks/prd-distill/`；核心流程不能依赖 hooks。
 
 安装方式和平台差异见 `references/platforms.md`。
 
@@ -75,7 +75,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 成功提交后不要再生成 PRD 或合同文件。如果提交后、推送前才发现缺文档，优先 amend 同一个 commit。如果已经推送，只有在用户明确同意时才创建后续提交。
 
-Claude Code hooks 可能会在存在 PRD / 合同草稿时阻止 `git commit`。把这个阻止视为最后兜底：在同一个 agent 回合里继续运行本 skill 收尾、stage 生成的文档，并自动重试 `git commit`，不要要求用户再次触发提交。
+Claude Code 全局 hooks 可能会在存在 PRD / 合同草稿时阻止 `git commit`。把这个阻止视为最后兜底：在同一个 agent 回合里继续运行本 skill 收尾、stage 生成的文档，并自动重试 `git commit`，不要要求用户再次触发提交。
 
 ## 文档模型
 
@@ -153,14 +153,14 @@ Claude Code hooks 可能会在存在 PRD / 合同草稿时阻止 `git commit`。
 
 ## Claude Code Hooks
 
-这个 skill 包含可选的 Claude Code hook 脚本，用于更严格的自动化：
+这个 skill 包含 Claude Code hook 脚本。使用本仓库安装器时，hooks 默认安装为全局 hooks：
 
 - `scripts/claude_hooks/harvest_prd_prompt.py`：把强需求片段收集到 `docs/prd/inbox/`。
 - `scripts/claude_hooks/guard_prd_commit.py`：当 PRD 或合同 inbox 草稿待处理时，阻止 `git commit`。
 
-安装 hooks 前先阅读 `references/claude-code-hooks.md`。
+hooks 安装位置是 `~/.claude/settings.json` 和 `~/.claude/hooks/prd-distill/`。如需跳过，安装时传 `--no-claude-hooks`。详细行为见 `references/claude-code-hooks.md`。
 
-Codex 不使用 Claude Code hooks。在 Codex 会话中，直接运行 skill 工作流，并在提交前运行 `scripts/prd_distill.py check --root <repo>`。
+Codex 没有 Claude Code 这种 prompt/tool 生命周期 hooks。在 Codex 会话中，直接运行 skill 工作流，并在提交前运行 `scripts/prd_distill.py check --root <repo>`；不要把 Codex 描述成支持等价自动 hook。
 
 ## 约束
 

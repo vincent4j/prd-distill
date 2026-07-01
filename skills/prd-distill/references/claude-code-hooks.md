@@ -1,14 +1,14 @@
 # Claude Code Hooks
 
-只有当用户需要比手动调用 skill 更多的自动化时，才安装 hooks。Hooks 是可选项；不安装 hooks，skill 核心流程仍然可用。
+使用本仓库安装器安装到 Claude Code 时，hooks 默认安装为全局 hooks。核心 skill 流程仍然不能依赖 hooks；hooks 只是自动收集和提交前拦截的兜底层。
 
 ## 安装位置
 
-项目级 hooks：
+全局 hooks：
 
 ```text
-.claude/settings.json
-.claude/hooks/
+~/.claude/settings.json
+~/.claude/hooks/prd-distill/
 ```
 
 skill 提供的 hook 脚本：
@@ -17,7 +17,7 @@ skill 提供的 hook 脚本：
 skills/prd-distill/scripts/claude_hooks/
 ```
 
-安装器会把脚本复制到项目 `.claude/hooks/`，并更新项目 `.claude/settings.json`。
+安装器会把脚本复制到 `~/.claude/hooks/prd-distill/`，并更新 `~/.claude/settings.json`。如果不想安装全局 hooks，运行安装器时传 `--no-claude-hooks`。
 
 ## 推荐配置
 
@@ -29,7 +29,7 @@ skills/prd-distill/scripts/claude_hooks/
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/harvest_prd_prompt.py\""
+            "command": "python3 ~/.claude/hooks/prd-distill/harvest_prd_prompt.py"
           }
         ]
       }
@@ -40,7 +40,7 @@ skills/prd-distill/scripts/claude_hooks/
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_prd_commit.py\""
+            "command": "python3 ~/.claude/hooks/prd-distill/guard_prd_commit.py"
           }
         ]
       }
