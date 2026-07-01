@@ -31,11 +31,11 @@ For installation and platform differences, read `references/platforms.md`.
 When the user invokes `/prd-distill`, `$prd-distill`, or names this skill without a specific task, show this menu and wait for the user's choice:
 
 ```text
-PRD Distill - 需求蒸馏台
+PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 1. 提炼 PRD
-2. 整理合同
-3. 检查一致性
+2. 整理需求合同
+3. 检查实现与文档是否一致
 
 请选择操作（输入 1-3）：
 ```
@@ -49,12 +49,12 @@ Handle choices as follows:
    - Update the module PRD and `docs/prd/README.md`.
    - Run `scripts/prd_distill.py check --root <repo>`.
 
-2. **整理合同**
+2. **整理需求合同**
    - Inspect strong constraints in user messages, `docs/prd/inbox/`, recent plans/worklogs, and existing contracts.
    - Create draft contracts with `scripts/prd_distill.py new-contract ...` when the constraint is not yet stable.
    - Promote to active module contract only when the requirement, failure handling, test binding, and runtime/log evidence are clear.
 
-3. **检查一致性**
+3. **检查实现与文档是否一致**
    - Run `scripts/prd_distill.py check --root <repo>`.
    - Compare active contracts with linked PRD sections and current implementation when relevant.
    - Report missing PRD links, missing tests, missing runtime evidence, stale inbox drafts, and implementation drift.
