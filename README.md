@@ -33,9 +33,42 @@ PRD Distill 的目标是做中间那层“蒸馏”：
 - **提炼 PRD**：读取聊天上下文、`docs/plans/`、`docs/worklog/`、已有 PRD 和 `git diff`，更新模块级 PRD。
 - **整理约束合同**：把“必须 / 不能 / 每个 / 之前解决过又复现”这类强约束，沉淀到 `docs/prd/contracts/`。
 - **检查实现与文档是否一致**：提交前检查 PRD、合同、测试和运行证据是否对齐。
+- **开发前学习模块上下文**：后续开发同一模块时，先从 `docs/prd/README.md` 定位模块，再按关键词检索相关 PRD 章节和合同条目。
+- **保护既有合同不回归**：改代码前识别受影响合同，改完后按受影响合同条目逐条回归验证，避免把原本正确的行为改坏。
 - **Claude Code 自动化**：默认安装全局 hooks，支持聊天时自动收集强需求片段，以及提交前拦截未收尾的 PRD / 合同草稿。
 
 这里的“约束合同”不是法律合同，而是一条可检查的长期规则。例如：某个字段必须来自哪个来源、缺失时必须失败而不是猜测、某个高风险流程必须有测试和运行证据。
+
+## PRD 和合同如何在后续开发中生效
+
+PRD Distill 保存 PRD / 合同，不只是为了归档。更重要的是让后续 agent 在继续开发同一模块时，能用低 token 成本找到当前任务相关的规则，再开始改代码。
+
+为了让新会话也能自动遵守这套规则，PRD Distill 会把一段很短的桥接规则写入项目入口文档：
+
+- `AGENTS.md` 给 Codex / OpenAI agents 读取。
+- `CLAUDE.md` 给 Claude Code 读取。
+- 两个文件都存在时，两个都写入同一段规则，保持一致。
+- 只存在一个时，只写入已有文件。
+- 两个都不存在时，默认创建两个。
+
+这段桥接规则只告诉 agent “开发前要去 `docs/prd/` 查模块 PRD 和合同”，真正的 PRD / 合同内容仍然只保存在 `docs/prd/`，不会复制成两份。
+
+当你提出一个新需求，例如“优化小红书本地采集的质量评分”或“改一下洞察加载逻辑”时，agent 应该先做三件事：
+
+1. 从 `docs/prd/README.md` 找到对应模块。
+2. 用关键词、文件名、接口名、字段名或合同 ID，在模块 PRD 和 `docs/prd/contracts/<module>.md` 中检索相关章节。
+3. 只读取命中的章节、相邻上下文和相关合同条目，再把本次改动可能影响的合同列出来。
+
+如果你提到一个当前会话里陌生的概念，agent 不应该先猜，也不应该马上问你重复解释；它应该先去模块 PRD 和合同里搜索这个词，理解它在项目里的定义。只有文档里找不到时，才向你确认。
+
+防回归依赖两件事：
+
+- 合同里要写清楚“要求 / 失败处理 / 测试 / 运行证据”。
+- agent 改代码前要识别受影响合同，改完后要按本次实际影响的合同条目逐条做回归验证：合同条目绑定了测试命令的，必须运行对应测试；合同条目要求运行证据的，必须检查或补充日志、截图、接口响应等证明；如果某个受影响合同暂时无法验证，必须明确说明原因、风险和后续需要补的测试。
+
+如果新需求和既有 PRD / 合同冲突，agent 不能自己决定覆盖旧规则。它必须先停下来，列出冲突点、受影响的 PRD / 合同条目和可能后果，请你确认是否变更规则。只有你明确确认后，才能更新 PRD / 合同并继续实现。
+
+所以合同不是独立文档，而是模块 PRD 的可执行约束层：它告诉后续开发“这块以前已经对了，别改坏”。
 
 ## Codex 和 Claude Code 的区别
 
@@ -53,9 +86,9 @@ PRD Distill 的目标是做中间那层“蒸馏”：
 - Claude Code 可以做到：**聊天时自动收集 + 提交前自动拦截**。
 - Codex 可以做到：**手动触发 / 提交前 agent 触发**，但做不到“每条用户消息自动进 inbox”。
 
-## Claude Code 全局 hooks 如何工作
+## Claude Code hooks 如何工作
 
-Claude Code 的全局 hooks 是 PRD Distill 的关键自动化层。完整安装后，它会写入 `~/.claude/settings.json`，并把脚本放到 `~/.claude/hooks/prd-distill/`。之后所有 Claude Code 项目都会自动拥有两道机制：
+Claude Code hooks 是 PRD Distill 的关键自动化层。完整安装后，它会写入 `~/.claude/settings.json`，并把脚本放到 `~/.claude/hooks/prd-distill/`。之后所有 Claude Code 项目都会自动拥有两道机制：
 
 1. **聊天时收集强需求**
    每次你发送消息后，`UserPromptSubmit` hook 会检查这条消息里是否出现“必须 / 不能 / 每个 / 之前解决过 / 为什么会没有”这类强约束信号。如果命中，它会把原文片段追加到当前项目的 `docs/prd/inbox/YYYY-MM-DD-requirement-fragments.md`。
@@ -134,6 +167,24 @@ Claude Code 中输入：
 3. 检查实现与文档是否一致
 ```
 
+首次在某个项目里启用 PRD Distill 时，可以初始化文档结构和项目入口桥接规则：
+
+```bash
+python3 ~/.codex/skills/prd-distill/scripts/prd_distill.py init --root .
+```
+
+`init` 会同时创建 `docs/prd/` 基础结构，并按规则写入 `AGENTS.md` / `CLAUDE.md` 的 PRD Distill 受控块。已有项目如果只想补装或刷新桥接规则，也可以单独运行：
+
+```bash
+python3 ~/.codex/skills/prd-distill/scripts/prd_distill.py install-bridge --root .
+```
+
+如果你只安装在 Claude Code，可以把路径换成：
+
+```bash
+python3 ~/.claude/skills/prd-distill/scripts/prd_distill.py install-bridge --root .
+```
+
 ## 生成的文件
 
 PRD Distill 会在项目中生成或更新：
@@ -150,6 +201,16 @@ docs/
         └── [module].md            # 已生效的模块约束合同
 ```
 
+此外，`install-bridge` 会在项目根目录更新 `AGENTS.md` / `CLAUDE.md` 中的 PRD Distill 受控块：
+
+```md
+<!-- prd-distill:start -->
+...
+<!-- prd-distill:end -->
+```
+
+重复运行时只更新这个受控块，不会改写项目里的其他说明。
+
 ## 和 context-keeper 的关系
 
 `context-keeper` 和 `prd-distill` 不是替代关系，而是上下游关系。
@@ -162,6 +223,8 @@ docs/
 1. 工作结束时，用 `context-keeper` 保存当天上下文。
 2. 当某个模块的需求逐渐稳定，或准备提交代码时，用 PRD Distill 把近期碎片提炼进 `docs/prd/`。
 3. 后续 agent 不需要翻完整聊天记录，只看模块 PRD 和约束合同，就能知道当前有效规则。
+
+如果两个 skill 都安装在 Claude Code 中，同一会话里最顺的顺序是：先运行 `context-keeper` 生成 `docs/plans/` 和 `docs/worklog/`，再运行 `/prd-distill` 提炼稳定需求，最后再提交。这样全局 hooks 在提交前看到的就是已经收尾的状态，不会因为待处理 PRD / 合同草稿而阻止提交。
 
 你可以只安装 PRD Distill；如果项目里已经有 `context-keeper` 生成的 `docs/plans/` 和 `docs/worklog/`，PRD Distill 会把它们当作更稳定的输入材料。
 

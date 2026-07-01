@@ -17,6 +17,22 @@ docs/prd/
   inbox/                     # PRD 需求碎片草稿
 ```
 
+项目根目录还可以包含入口桥接规则：
+
+```text
+AGENTS.md                    # Codex / OpenAI agents 常驻项目规则
+CLAUDE.md                    # Claude Code 常驻项目规则
+```
+
+`AGENTS.md` 和 `CLAUDE.md` 不是 PRD 正文，也不是合同来源。它们只保存 PRD Distill 的受控桥接块，让新会话知道开发前要去 `docs/prd/` 查模块 PRD 和合同。
+
+写入策略：
+
+- 两个文件都存在：两个都写入同一段 `prd-distill` 受控块。
+- 只存在一个：只写入已有文件。
+- 两个都不存在：默认创建两个。
+- 正式模块 PRD、合同正文、合同索引仍然只放在 `docs/prd/` 下。
+
 ## plans 和 PRD 的边界
 
 `plans` 是按时间组织的。这里保留原始用户碎片、本地上下文、被拒绝方案、临时范围和当天验证标准。
@@ -54,6 +70,8 @@ PRD = 完整模块规格
 |---|---|---|---|---|
 | 小红书本地采集 | 本地客户端驱动真实账号采集小红书内容 | [strategy-collector-xhs.md](strategy-collector-xhs.md) | [contracts/xhs-local-collector.md](contracts/xhs-local-collector.md) | [../plans/...](../plans/...) |
 ```
+
+`docs/prd/README.md` 是模块开发的入口。后续 agent 开发模块功能、修复模块 bug、或遇到陌生模块术语时，必须先通过这个索引定位主 PRD 和合同文件，再用关键词、文件名、接口名、字段名或合同 ID 检索并局部读取相关章节 / 合同条目。不要默认全文加载大型 PRD 或合同文件。
 
 ## 模块合同格式
 

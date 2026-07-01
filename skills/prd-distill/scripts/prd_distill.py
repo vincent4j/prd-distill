@@ -11,6 +11,24 @@ from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = SKILL_ROOT / "assets" / "templates"
+BRIDGE_START = "<!-- prd-distill:start -->"
+BRIDGE_END = "<!-- prd-distill:end -->"
+BRIDGE_CONTENT = f"""{BRIDGE_START}
+## PRD / 合同约束
+
+当用户要求开发已有模块、修改模块行为、修复模块 bug，或在当前会话中提到未解释过的模块 / 功能 / 业务名词时，先把 `docs/prd/` 当作项目知识库使用。
+
+执行规则：
+
+1. 先读取 `docs/prd/README.md` 模块索引，定位相关模块、主 PRD 和合同文件。
+2. 不要默认全文加载大型 PRD / 合同文档。根据用户提到的关键词、文件名、接口名、字段名、页面名或合同 ID，在相关 PRD / 合同中检索，只读取命中的章节、相邻上下文和相关合同条目。
+3. 如果当前会话不理解某个模块、功能或业务名词，先在 `docs/prd/README.md`、模块 PRD 和 `docs/prd/contracts/` 中搜索学习；文档里找不到时，再向用户确认。
+4. 开始实现前，列出本次改动可能影响的 PRD 规则或生效合同。
+5. 如果新需求与既有 PRD / 合同冲突，停止实现，明确列出冲突点、受影响的 PRD / 合同条目和可能后果，请用户确认是否变更规则。只有用户明确确认后，才能更新 PRD / 合同并继续实现。
+6. 实现完成后，按本次实际影响的合同条目逐条做回归验证：合同条目绑定了测试命令的，必须运行对应测试；合同条目要求运行证据的，必须检查或补充日志、截图、接口响应等证明；如果某个受影响合同暂时无法验证，必须明确说明原因、风险和后续需要补的测试。
+7. 提交前如果本轮产生了 `docs/plans/`、`docs/worklog/`、`docs/lessons-learned.md`，或存在 PRD / 合同相关变更，先运行 PRD Distill 收尾，再把代码和文档一起提交。
+{BRIDGE_END}
+"""
 
 
 _ARGPARSE_TRANSLATIONS = {
@@ -47,6 +65,41 @@ def _write_if_missing(path: Path, content: str) -> bool:
     return True
 
 
+def _select_bridge_targets(root: Path) -> list[Path]:
+    agents = root / "AGENTS.md"
+    claude = root / "CLAUDE.md"
+    existing = [path for path in (agents, claude) if path.exists()]
+    return existing or [agents, claude]
+
+
+def _upsert_bridge(path: Path) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(BRIDGE_CONTENT + "\n", encoding="utf-8")
+        return "created"
+
+    text = path.read_text(encoding="utf-8")
+    has_start = BRIDGE_START in text
+    has_end = BRIDGE_END in text
+    if has_start != has_end:
+        raise ValueError(f"{path}: PRD Distill 受控块不完整，请先手动修复")
+
+    if has_start:
+        pattern = re.compile(
+            re.escape(BRIDGE_START) + r".*?" + re.escape(BRIDGE_END),
+            re.DOTALL,
+        )
+        updated = pattern.sub(BRIDGE_CONTENT.rstrip(), text)
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+            return "updated"
+        return "unchanged"
+
+    separator = "" if text.endswith("\n\n") else "\n" if text.endswith("\n") else "\n\n"
+    path.write_text(text + separator + BRIDGE_CONTENT + "\n", encoding="utf-8")
+    return "appended"
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     prd = root / "docs" / "prd"
@@ -62,7 +115,37 @@ def cmd_init(args: argparse.Namespace) -> int:
     if _write_if_missing(contracts / "README.md", _read_template("contracts-readme.md")):
         created.append("docs/prd/contracts/README.md")
 
-    print(json.dumps({"created_or_existing": created}, ensure_ascii=False, indent=2))
+    bridge_results = []
+    for path in _select_bridge_targets(root):
+        action = _upsert_bridge(path)
+        bridge_results.append({
+            "file": str(path.relative_to(root)),
+            "action": action,
+        })
+
+    print(json.dumps({
+        "created_or_existing": created,
+        "bridge": bridge_results,
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_install_bridge(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    targets = _select_bridge_targets(root)
+    results = []
+    for path in targets:
+        action = _upsert_bridge(path)
+        results.append({
+            "file": str(path.relative_to(root)),
+            "action": action,
+        })
+
+    print(json.dumps({
+        "root": str(root),
+        "targets": results,
+        "rule": "AGENTS.md 和 CLAUDE.md 都存在时同时写入；都不存在时默认创建两个；只存在一个时只写入已有文件。",
+    }, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -182,6 +265,10 @@ def build_parser() -> argparse.ArgumentParser:
     init = sub.add_parser("init", help="初始化 docs/prd 结构")
     init.add_argument("--root", default=".")
     init.set_defaults(func=cmd_init)
+
+    bridge = sub.add_parser("install-bridge", help="安装 AGENTS.md / CLAUDE.md 桥接规则")
+    bridge.add_argument("--root", default=".")
+    bridge.set_defaults(func=cmd_install_bridge)
 
     scan = sub.add_parser("scan", help="扫描 PRD 相关文档")
     scan.add_argument("--root", default=".")
