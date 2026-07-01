@@ -52,13 +52,25 @@ Claude Code hooks 是可选增强；不安装 hooks 也能正常使用核心 Ski
 Codex：
 
 ```text
-[$prd-distill] 整理最近 plans 到 PRD
+[$prd-distill]
 ```
 
 Claude Code：
 
 ```text
-/prd-distill 整理最近 plans 到 PRD
+/prd-distill
+```
+
+主动触发后会进入菜单：
+
+```text
+PRD Distill - 需求蒸馏台
+
+1. 提炼 PRD
+2. 整理合同
+3. 检查一致性
+
+请选择操作（输入 1-3）：
 ```
 
 ## 输出目录

@@ -1,6 +1,6 @@
 ---
 name: prd-distill
-description: Distill fragmented chat requirements, daily plans, worklogs, implementation diffs, and user corrections into module-level PRDs, docs/prd module indexes, and executable contracts under docs/prd/contracts. Use when the user asks to 整理 PRD, 同步 plans 到 PRD, 提炼需求, 归并需求, 检查 PRD 和实现一致性, 生成/更新合同, or when starting implementation after many requirement fragments or strong constraints like 必须/不能/每个/之前解决过又复现.
+description: Distill fragmented chat requirements, daily plans, worklogs, implementation diffs, and user corrections into module-level PRDs, docs/prd module indexes, and executable contracts under docs/prd/contracts. Use when the user invokes /prd-distill or $prd-distill, asks to 整理 PRD, 同步 plans 到 PRD, 提炼需求, 归并需求, 检查 PRD 和实现一致性, 生成/更新合同, or when starting implementation after many requirement fragments or strong constraints like 必须/不能/每个/之前解决过又复现.
 ---
 
 # PRD Distill
@@ -25,6 +25,39 @@ Support both Codex and Claude Code:
 - Claude Code hooks are optional automation. Do not require hooks for the core workflow.
 
 For installation and platform differences, read `references/platforms.md`.
+
+## Interactive Menu
+
+When the user invokes `/prd-distill`, `$prd-distill`, or names this skill without a specific task, show this menu and wait for the user's choice:
+
+```text
+PRD Distill - 需求蒸馏台
+
+1. 提炼 PRD
+2. 整理合同
+3. 检查一致性
+
+请选择操作（输入 1-3）：
+```
+
+Handle choices as follows:
+
+1. **提炼 PRD**
+   - Run `scripts/prd_distill.py scan --root <repo>` to discover pending fragments.
+   - Inspect recent `docs/plans/`, `docs/worklog/`, existing module PRDs, and relevant `git diff`.
+   - Ask for the target module only if it cannot be inferred.
+   - Update the module PRD and `docs/prd/README.md`.
+   - Run `scripts/prd_distill.py check --root <repo>`.
+
+2. **整理合同**
+   - Inspect strong constraints in user messages, `docs/prd/inbox/`, recent plans/worklogs, and existing contracts.
+   - Create draft contracts with `scripts/prd_distill.py new-contract ...` when the constraint is not yet stable.
+   - Promote to active module contract only when the requirement, failure handling, test binding, and runtime/log evidence are clear.
+
+3. **检查一致性**
+   - Run `scripts/prd_distill.py check --root <repo>`.
+   - Compare active contracts with linked PRD sections and current implementation when relevant.
+   - Report missing PRD links, missing tests, missing runtime evidence, stale inbox drafts, and implementation drift.
 
 ## Document Model
 
