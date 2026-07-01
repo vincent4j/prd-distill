@@ -1,5 +1,7 @@
 # prd-distill
 
+本 Skills 具备的能力：从会话中自动提炼和萃取出结构化的 PRD 存档。
+
 `prd-distill` distills chat fragments, daily plans, worklogs, and implementation diffs into module-level PRDs and executable contracts under `docs/prd/contracts/`.
 
 It is one shared skill package with first-class support for both Codex and Claude Code.
