@@ -1,84 +1,78 @@
 # prd-distill
 
-本 Skills 具备的能力：从会话中自动提炼和萃取出结构化的 PRD 存档。
+`prd-distill` 用来把聊天里的片段需求、每日 plans、工作日志和代码变更，提炼成模块级 PRD，并把必须遵守的硬约束沉淀为 `docs/prd/contracts/` 下的合同文档。
 
-`prd-distill` distills chat fragments, daily plans, worklogs, and implementation diffs into module-level PRDs and executable contracts under `docs/prd/contracts/`.
+它是一个同时支持 Codex 和 Claude Code 的 Skill。
 
-It is one shared skill package with first-class support for both Codex and Claude Code.
+## 安装
 
-## Install
+一键安装：
 
-Normal install:
+```bash
+npx skills add vincent4j/prd-distill
+```
+
+如果希望一次安装到 Codex、Claude Code 等所有本地支持的 Agent：
+
+```bash
+npx skills add vincent4j/prd-distill --all
+```
+
+如果之后新安装了 Codex 或 Claude Code，重新运行上面的安装命令即可补装。
+
+## 手动安装
+
+如果不使用 `npx skills`，也可以手动安装：
 
 ```bash
 python3 scripts/install.py
 ```
 
-The installer detects local runtimes and installs the skill where it can be used:
+手动安装器会自动检测本机运行时：
 
-- Codex only installed: installs for Codex.
-- Claude Code only installed: installs for Claude Code.
-- Both installed: installs for both.
-- Later you install the other runtime: run the same command again to add it.
+- 只安装了 Codex：安装到 Codex。
+- 只安装了 Claude Code：安装到 Claude Code。
+- 两者都安装了：两边都安装。
+- 后续新增其中一个运行时：重新运行同一条命令即可补装。
 
-Force install for both Codex and Claude Code:
+常用手动安装参数：
 
 ```bash
 python3 scripts/install.py --all
-```
-
-Install for Codex only:
-
-```bash
 python3 scripts/install.py --codex
-```
-
-Install for Codex with an explicit skills directory:
-
-```bash
-python3 scripts/install.py --codex --codex-dir ~/.agents/skills
-```
-
-Install for Claude Code only:
-
-```bash
 python3 scripts/install.py --claude
-```
-
-Install into a Claude Code project with hooks:
-
-```bash
+python3 scripts/install.py --codex --codex-dir ~/.agents/skills
 python3 scripts/install.py --all --claude-project /path/to/project --install-claude-hooks
 ```
 
-Claude Code hooks are optional. The core skill works without hooks; hooks add deterministic prompt harvesting and commit-time checks.
+Claude Code hooks 是可选增强；不安装 hooks 也能正常使用核心 Skill。hooks 只负责自动收集强约束片段和提交前提醒。
 
-## Layout
+## 使用
 
-```text
-skills/prd-distill/       # skill package shared by Codex and Claude Code
-scripts/install.py        # installer for both runtimes
-```
-
-## Runtime Entry Points
-
-Codex:
+Codex：
 
 ```text
 [$prd-distill] 整理最近 plans 到 PRD
 ```
 
-Claude Code:
+Claude Code：
 
 ```text
 /prd-distill 整理最近 plans 到 PRD
 ```
 
-## Core Outputs
+## 输出目录
 
 ```text
 docs/prd/README.md
+docs/prd/inbox/
 docs/prd/contracts/
 docs/prd/contracts/inbox/
-docs/prd/inbox/
+```
+
+## 仓库结构
+
+```text
+skills/prd-distill/       # Codex 和 Claude Code 共用的 Skill 包
+scripts/install.py        # 手动安装器
 ```
