@@ -71,9 +71,11 @@ When the user asks to commit, save and commit, push, or when the agent is about 
 3. Stage generated or updated PRD/contract files with the code changes.
 4. Commit once, with code and PRD/contract closeout in the same commit.
 
+This is the normal path. Do not wait for a failed `git commit` hook to start PRD closeout.
+
 Do not generate PRD or contract files after a successful commit. If the closeout discovers missing docs after committing but before pushing, amend the same commit. If the commit was already pushed, create a follow-up commit only with explicit user approval.
 
-Claude Code hooks may block `git commit` when pending PRD/contract drafts exist. Treat that block as a pre-commit reminder to run this skill and include the resulting docs in the same commit.
+Claude Code hooks may block `git commit` when pending PRD/contract drafts exist. Treat that block as a last-resort guardrail: continue in the same agent turn, run this skill's closeout, stage the generated docs, and retry `git commit` without asking the user to trigger commit again.
 
 ## Document Model
 

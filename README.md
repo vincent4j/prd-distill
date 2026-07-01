@@ -93,6 +93,8 @@ scripts/install.py        # 手动安装器
 
 `prd-distill` 的收尾应该发生在 `git commit` 之前，而不是提交之后。
 
+正常情况下，Agent 在你说“保存并提交 / 提交代码 / push”时，会先做收尾，再提交，不需要等提交失败。
+
 推荐流程：
 
 1. 先运行 `/prd-distill` 或 `[$prd-distill]`。
@@ -101,3 +103,5 @@ scripts/install.py        # 手动安装器
 4. 再执行 `git commit`。
 
 这样 PRD / 合同文档会和代码进入同一个提交，不需要提交后再补一次 md。
+
+Claude Code hooks 只是兜底保险：如果 Agent 忘了收尾就直接提交，hook 会拦住这次提交；Agent 应该在同一轮自动完成收尾、重新 `git add` 并再次提交，不需要用户再次触发。

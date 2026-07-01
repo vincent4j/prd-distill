@@ -69,10 +69,11 @@ def main() -> int:
     more = "" if len(pending) <= 8 else f"\n... and {len(pending) - 8} more"
     _deny(
         "PRD Distill found pending PRD/contract inbox drafts before commit. "
-        "Run /prd-distill, finish PRD/constraint-contract closeout, stage the "
-        "generated docs with the code, then retry git commit. This keeps docs "
-        "and implementation in the same commit. Set PRD_DISTILL_ALLOW_PENDING=1 "
-        "to bypass intentionally.\n"
+        "This is a last-resort guardrail: continue in the same agent turn, run "
+        "/prd-distill closeout, stage the generated docs with the code, then "
+        "retry git commit. Do not ask the user to trigger commit again. This "
+        "keeps docs and implementation in the same commit. Set "
+        "PRD_DISTILL_ALLOW_PENDING=1 to bypass intentionally.\n"
         f"{sample}{more}"
     )
     return 0

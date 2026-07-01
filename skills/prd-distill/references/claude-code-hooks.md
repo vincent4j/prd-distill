@@ -62,7 +62,7 @@ Copy or reference the scripts from project `.claude/settings.json`.
 
 - Runs on Bash tool calls and exits without action unless the command is a `git commit`.
 - Blocks commits when `docs/prd/inbox/*.md` or `docs/prd/contracts/inbox/*.md` contains pending drafts.
-- The block is intentionally pre-commit. Run `/prd-distill`, stage generated PRD/contract docs with code, then retry the commit.
+- The block is a last-resort pre-commit guardrail. The agent should run `/prd-distill`, stage generated PRD/contract docs with code, then retry the commit in the same turn.
 - Set `PRD_DISTILL_ALLOW_PENDING=1` to bypass intentionally.
 
 ## Safety
