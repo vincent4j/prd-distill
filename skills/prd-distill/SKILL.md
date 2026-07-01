@@ -1,6 +1,6 @@
 ---
 name: prd-distill
-description: "把聊天里的片段需求、每日 plans、工作日志、代码变更和用户纠正，提炼成模块级 PRD、docs/prd 模块索引，以及 docs/prd/contracts 下的约束合同。用户调用 /prd-distill 或 $prd-distill，要求整理 PRD、同步 plans 到 PRD、提炼需求、归并需求、检查 PRD 和实现一致性、生成/更新合同，或在需求密集工作后准备 git commit / 保存并提交时使用。也用于开发已有模块功能、修复模块 bug、触碰已有 PRD / contracts 约束、需要防止违反既有合同回归、或用户提到当前会话不熟悉的模块概念时，先通过模块索引和检索按需读取相关 PRD 章节与合同条目。"
+description: "把对话里的零散需求、纠正、临时决策和代码变更，提炼成结构化模块 PRD 与长期约束合同。Use when the user calls /prd-distill or $prd-distill, asks to 提炼 PRD、整理约束合同、检查实现与文档是否一致、同步 plans/worklog 到 PRD、提交前收尾，或在开发已有模块 / 修复 bug 时需要按需读取 PRD / contracts 防止回归。"
 ---
 
 # PRD Distill
