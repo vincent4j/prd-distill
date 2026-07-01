@@ -1,4 +1,4 @@
 interface:
   display_name: "PRD Distill"
-  short_description: "把聊天碎片提炼为模块 PRD，并在开发前读取 PRD / 合同防止回归"
-  default_prompt: "使用 $prd-distill 读取模块 PRD 和约束合同，将最近的 plans、worklog 和实现变更提炼为长期规格。"
+  short_description: "把对话里的零散需求、纠正和临时决策，提炼成模块 PRD 与约束合同"
+  default_prompt: "使用 $prd-distill 把对话里的零散需求、纠正、临时决策和代码变更，提炼成结构化模块 PRD 与长期约束合同。"
