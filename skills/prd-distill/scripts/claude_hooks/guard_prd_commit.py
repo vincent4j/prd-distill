@@ -66,14 +66,13 @@ def main() -> int:
     if not pending:
         return 0
     sample = "\n".join(f"- {path.relative_to(root)}" for path in pending[:8])
-    more = "" if len(pending) <= 8 else f"\n... and {len(pending) - 8} more"
+    more = "" if len(pending) <= 8 else f"\n... 另有 {len(pending) - 8} 个"
     _deny(
-        "PRD Distill found pending PRD/contract inbox drafts before commit. "
-        "This is a last-resort guardrail: continue in the same agent turn, run "
-        "/prd-distill closeout, stage the generated docs with the code, then "
-        "retry git commit. Do not ask the user to trigger commit again. This "
-        "keeps docs and implementation in the same commit. Set "
-        "PRD_DISTILL_ALLOW_PENDING=1 to bypass intentionally.\n"
+        "PRD Distill 在提交前发现待处理的 PRD / 合同 inbox 草稿。"
+        "这是最后兜底保护：请在同一个 agent 回合继续运行 /prd-distill 收尾，"
+        "把生成的文档和代码一起 stage，然后重试 git commit。"
+        "不要要求用户再次触发提交。这样可以让文档和实现进入同一个 commit。"
+        "如需有意识绕过，可设置 PRD_DISTILL_ALLOW_PENDING=1。\n"
         f"{sample}{more}"
     )
     return 0

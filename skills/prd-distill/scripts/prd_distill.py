@@ -13,9 +13,22 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = SKILL_ROOT / "assets" / "templates"
 
 
+_ARGPARSE_TRANSLATIONS = {
+    "usage: ": "用法：",
+    "positional arguments": "位置参数",
+    "options": "选项",
+    "optional arguments": "选项",
+    "show this help message and exit": "显示帮助并退出",
+    "the following arguments are required: %s": "缺少必填参数：%s",
+    "invalid choice: %(value)r (choose from %(choices)s)": "无效选择：%(value)r（可选：%(choices)s）",
+}
+
+argparse._ = lambda text: _ARGPARSE_TRANSLATIONS.get(text, text)
+
+
 def _slug(text: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9\u4e00-\u9fff]+", "-", text.strip()).strip("-")
-    return cleaned.lower() or "general"
+    return cleaned.lower() or "通用"
 
 
 def _today() -> str:
@@ -96,7 +109,7 @@ def cmd_new_contract(args: argparse.Namespace) -> int:
         content = content.replace(old, new)
 
     if path.exists() and not args.force:
-        print(f"exists: {path}", file=sys.stderr)
+        print(f"文件已存在：{path}", file=sys.stderr)
         return 1
     path.write_text(content, encoding="utf-8")
     print(path)
@@ -139,23 +152,23 @@ def cmd_check(args: argparse.Namespace) -> int:
     warnings: list[str] = []
 
     if not (root / "docs" / "prd" / "README.md").exists():
-        warnings.append("missing docs/prd/README.md module index")
+        warnings.append("缺少 docs/prd/README.md 模块索引")
     if not (root / "docs" / "prd" / "contracts" / "README.md").exists():
-        warnings.append("missing docs/prd/contracts/README.md contract index")
+        warnings.append("缺少 docs/prd/contracts/README.md 合同索引")
 
     pending = _pending_files(root)
     if pending:
-        warnings.append(f"pending PRD/contract drafts: {len(pending)}")
+        warnings.append(f"待处理 PRD / 合同草稿：{len(pending)}")
 
     for path in _active_contract_files(root):
         text = path.read_text(encoding="utf-8")
         for required in ("## 关联 PRD", "## 合同列表"):
             if required not in text:
-                errors.append(f"{path}: missing {required}")
+                errors.append(f"{path}: 缺少 {required}")
         if "测试" not in text:
-            errors.append(f"{path}: active contracts must mention tests")
+            errors.append(f"{path}: 生效合同必须说明测试")
         if "运行证据" not in text:
-            errors.append(f"{path}: active contracts must mention runtime evidence")
+            errors.append(f"{path}: 生效合同必须说明运行证据")
 
     result = {"errors": errors, "warnings": warnings}
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -163,34 +176,34 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="PRD Distill helper")
+    parser = argparse.ArgumentParser(description="PRD Distill 辅助工具")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    init = sub.add_parser("init", help="initialize docs/prd structure")
+    init = sub.add_parser("init", help="初始化 docs/prd 结构")
     init.add_argument("--root", default=".")
     init.set_defaults(func=cmd_init)
 
-    scan = sub.add_parser("scan", help="scan PRD-related docs")
+    scan = sub.add_parser("scan", help="扫描 PRD 相关文档")
     scan.add_argument("--root", default=".")
     scan.set_defaults(func=cmd_scan)
 
-    new_contract = sub.add_parser("new-contract", help="create a draft contract")
+    new_contract = sub.add_parser("new-contract", help="创建合同草稿")
     new_contract.add_argument("--root", default=".")
     new_contract.add_argument("--module", required=True)
     new_contract.add_argument("--title", required=True)
     new_contract.add_argument("--kind", default="decision")
-    new_contract.add_argument("--source", default="user_feedback")
+    new_contract.add_argument("--source", default="用户反馈")
     new_contract.add_argument("--trigger", default="")
-    new_contract.add_argument("--contract", default="TBD")
+    new_contract.add_argument("--contract", default="待补充")
     new_contract.add_argument("--force", action="store_true")
     new_contract.set_defaults(func=cmd_new_contract)
 
-    pending = sub.add_parser("pending", help="list pending PRD/contract drafts")
+    pending = sub.add_parser("pending", help="列出待处理 PRD / 合同草稿")
     pending.add_argument("--root", default=".")
     pending.add_argument("--fail", action="store_true")
     pending.set_defaults(func=cmd_pending)
 
-    check = sub.add_parser("check", help="validate PRD/contract structure")
+    check = sub.add_parser("check", help="校验 PRD / 合同结构")
     check.add_argument("--root", default=".")
     check.set_defaults(func=cmd_check)
     return parser

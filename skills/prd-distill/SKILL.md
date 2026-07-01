@@ -1,34 +1,34 @@
 ---
 name: prd-distill
-description: Distill fragmented chat requirements, daily plans, worklogs, implementation diffs, and user corrections into module-level PRDs, docs/prd module indexes, and executable contracts under docs/prd/contracts. Use when the user invokes /prd-distill or $prd-distill, asks to 整理 PRD, 同步 plans 到 PRD, 提炼需求, 归并需求, 检查 PRD 和实现一致性, 生成/更新合同, or before git commit / 保存并提交 when PRD and contract closeout may be needed after requirement-heavy work.
+description: "把聊天里的片段需求、每日 plans、工作日志、代码变更和用户纠正，提炼成模块级 PRD、docs/prd 模块索引，以及 docs/prd/contracts 下的约束合同。用户调用 /prd-distill 或 $prd-distill，要求整理 PRD、同步 plans 到 PRD、提炼需求、归并需求、检查 PRD 和实现一致性、生成/更新合同，或在需求密集工作后准备 git commit / 保存并提交时使用。"
 ---
 
 # PRD Distill
 
-## Purpose
+## 目标
 
-Turn scattered requirement fragments into durable module specifications:
+把分散的需求碎片沉淀成可长期维护的模块规格：
 
 ```text
-chat fragments / docs/plans / docs/worklog / git diff
-  -> module PRD
-  -> docs/prd/README.md module index
-  -> docs/prd/contracts/<module>.md executable contracts
+聊天碎片 / docs/plans / docs/worklog / git diff
+  -> 模块 PRD
+  -> docs/prd/README.md 模块索引
+  -> docs/prd/contracts/<module>.md 约束合同
 ```
 
-Keep `context-keeper` independent. This skill may read its `docs/plans/`, `docs/worklog/`, and `docs/lessons-learned.md` outputs when present, but must also work without them.
+保持 `context-keeper` 独立。这个 skill 可以读取 `context-keeper` 生成的 `docs/plans/`、`docs/worklog/` 和 `docs/lessons-learned.md`，但不能依赖它才能工作。
 
-Support both Codex and Claude Code:
+同时支持 Codex 和 Claude Code：
 
-- Codex: install this folder as `~/.codex/skills/prd-distill`, or another Codex skills directory such as `~/.agents/skills/prd-distill`.
-- Claude Code: install this folder as `~/.claude/skills/prd-distill` or `<project>/.claude/skills/prd-distill`.
-- Claude Code hooks are optional automation. Do not require hooks for the core workflow.
+- Codex：安装到 `~/.codex/skills/prd-distill`，或其他 Codex skills 目录，例如 `~/.agents/skills/prd-distill`。
+- Claude Code：安装到 `~/.claude/skills/prd-distill` 或 `<project>/.claude/skills/prd-distill`。
+- Claude Code hooks 是可选自动化；核心流程不能依赖 hooks。
 
-For installation and platform differences, read `references/platforms.md`.
+安装方式和平台差异见 `references/platforms.md`。
 
-## Interactive Menu
+## 主动触发菜单
 
-When the user invokes `/prd-distill`, `$prd-distill`, or names this skill without a specific task, show this menu and wait for the user's choice:
+当用户调用 `/prd-distill`、`$prd-distill`，或只点名这个 skill 但没有给出具体任务时，展示菜单并等待用户选择：
 
 ```text
 PRD Distill - 从会话中提炼和萃取出结构化的 PRD
@@ -40,133 +40,133 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 请选择操作（输入 1-3）：
 ```
 
-Handle choices as follows:
+按以下规则处理选择：
 
 1. **提炼 PRD**
-   - Run `scripts/prd_distill.py scan --root <repo>` to discover pending fragments.
-   - Inspect recent `docs/plans/`, `docs/worklog/`, existing module PRDs, and relevant `git diff`.
-   - Ask for the target module only if it cannot be inferred.
-   - Update the module PRD and `docs/prd/README.md`.
-   - Run `scripts/prd_distill.py check --root <repo>`.
+   - 运行 `scripts/prd_distill.py scan --root <repo>`，发现待处理碎片。
+   - 检查近期 `docs/plans/`、`docs/worklog/`、已有模块 PRD 和相关 `git diff`。
+   - 只有在无法推断目标模块时才询问用户。
+   - 更新模块 PRD 和 `docs/prd/README.md`。
+   - 运行 `scripts/prd_distill.py check --root <repo>`。
 
 2. **整理约束合同**
-   - Inspect strong constraints in user messages, `docs/prd/inbox/`, recent plans/worklogs, and existing contracts.
-   - Create draft contracts with `scripts/prd_distill.py new-contract ...` when the constraint is not yet stable.
-   - Promote to active module contract only when the requirement, failure handling, test binding, and runtime/log evidence are clear.
+   - 检查用户消息、`docs/prd/inbox/`、近期 plans/worklogs 和已有合同中的强约束。
+   - 当约束还不稳定时，用 `scripts/prd_distill.py new-contract ...` 创建草稿合同。
+   - 只有当要求、失败处理、测试绑定、运行/日志证据都清楚时，才提升为生效模块合同。
 
 3. **检查实现与文档是否一致**
-   - Run `scripts/prd_distill.py check --root <repo>`.
-   - Compare active contracts with linked PRD sections and current implementation when relevant.
-   - Report missing PRD links, missing tests, missing runtime evidence, stale inbox drafts, and implementation drift.
+   - 运行 `scripts/prd_distill.py check --root <repo>`。
+   - 在相关时，对比生效合同、关联 PRD 章节和当前实现。
+   - 报告缺失的 PRD 链接、缺失测试、缺失运行证据、过期 inbox 草稿，以及实现和文档漂移。
 
-## Commit Closeout
+## 提交前收尾
 
-When the user asks to commit, save and commit, push, or when the agent is about to run `git commit`, run PRD Distill closeout **before** the commit:
+当用户要求提交、保存并提交、推送，或 agent 准备运行 `git commit` 时，必须在提交前执行 PRD Distill 收尾：
 
-1. Run `scripts/prd_distill.py scan --root <repo>` and inspect pending PRD/contract inbox drafts.
-2. If requirement fragments, strong constraints, or PRD-impacting implementation changes are present, run the relevant menu action first:
-   - Use **提炼 PRD** for module behavior, workflows, fields, acceptance criteria, and changed decisions.
-   - Use **整理约束合同** for hard constraints that must be tested or evidenced.
-   - Use **检查实现与文档是否一致** before the final commit attempt.
-3. Stage generated or updated PRD/contract files with the code changes.
-4. Commit once, with code and PRD/contract closeout in the same commit.
+1. 运行 `scripts/prd_distill.py scan --root <repo>`，检查待处理的 PRD / 合同 inbox 草稿。
+2. 如果存在需求碎片、强约束，或会影响 PRD 的实现变更，先运行对应菜单动作：
+   - 用 **提炼 PRD** 处理模块行为、工作流、字段、验收标准和决策变化。
+   - 用 **整理约束合同** 处理必须被测试或运行证据证明的硬约束。
+   - 在最后一次提交前使用 **检查实现与文档是否一致**。
+3. 将生成或更新的 PRD / 合同文件和代码变更一起 stage。
+4. 只提交一次，让代码和 PRD / 合同收尾进入同一个 commit。
 
-This is the normal path. Do not wait for a failed `git commit` hook to start PRD closeout.
+这是正常路径。不要等 `git commit` hook 失败后才开始 PRD 收尾。
 
-Do not generate PRD or contract files after a successful commit. If the closeout discovers missing docs after committing but before pushing, amend the same commit. If the commit was already pushed, create a follow-up commit only with explicit user approval.
+成功提交后不要再生成 PRD 或合同文件。如果提交后、推送前才发现缺文档，优先 amend 同一个 commit。如果已经推送，只有在用户明确同意时才创建后续提交。
 
-Claude Code hooks may block `git commit` when pending PRD/contract drafts exist. Treat that block as a last-resort guardrail: continue in the same agent turn, run this skill's closeout, stage the generated docs, and retry `git commit` without asking the user to trigger commit again.
+Claude Code hooks 可能会在存在 PRD / 合同草稿时阻止 `git commit`。把这个阻止视为最后兜底：在同一个 agent 回合里继续运行本 skill 收尾、stage 生成的文档，并自动重试 `git commit`，不要要求用户再次触发提交。
 
-## Document Model
+## 文档模型
 
-Use this boundary:
+使用以下边界：
 
-- `docs/plans/`: time-based raw fragments for a day or session.
-- `docs/worklog/`: what happened and why.
-- `docs/prd/*.md`: current module-level product or technical truth.
-- `docs/prd/README.md`: module index mapping modules to PRDs and contract docs.
-- `docs/prd/contracts/`: hard PRD constraints with tests and runtime evidence.
-- `docs/prd/contracts/inbox/`: draft contract candidates, not yet active.
+- `docs/plans/`：按日期/会话保存的原始需求碎片。
+- `docs/worklog/`：实际做了什么，以及为什么这么做。
+- `docs/prd/*.md`：当前有效的模块级产品或技术事实。
+- `docs/prd/README.md`：模块索引，映射模块、PRD 和合同文档。
+- `docs/prd/contracts/`：带测试和运行证据的硬约束。
+- `docs/prd/contracts/inbox/`：合同候选草稿，尚未生效。
 
-For detailed formats, read `references/doc-model.md`.
+详细格式见 `references/doc-model.md`。
 
-## Workflow
+## 工作流
 
-1. Discover repository structure:
-   - Inspect `docs/prd/`, `docs/plans/`, `docs/worklog/`, and recent `git diff`.
-   - If the PRD structure is missing, run `scripts/prd_distill.py init --root <repo>`.
+1. 发现仓库结构：
+   - 检查 `docs/prd/`、`docs/plans/`、`docs/worklog/` 和近期 `git diff`。
+   - 如果 PRD 结构缺失，运行 `scripts/prd_distill.py init --root <repo>`。
 
-2. Identify the module:
-   - Prefer existing module names from `docs/prd/README.md`.
-   - Otherwise infer a short module name from the request and affected files.
-   - Ask only if several modules are equally plausible.
+2. 识别模块：
+   - 优先使用 `docs/prd/README.md` 里的已有模块名。
+   - 否则从用户请求和受影响文件推断短模块名。
+   - 只有多个模块同样合理时才询问用户。
 
-3. Collect inputs:
-   - Recent plans/worklogs relevant to the module.
-   - Existing module PRD and contract docs.
-   - User corrections, rejected approaches, strong constraints, and implementation diff.
+3. 收集输入：
+   - 与模块相关的近期 plans / worklogs。
+   - 现有模块 PRD 和合同文档。
+   - 用户纠正、被拒绝方案、强约束和实现 diff。
 
-4. Distill, do not dump:
-   - Move transient debugging details to worklogs, not PRDs.
-   - Keep PRDs as current effective behavior.
-   - Preserve superseded decisions only when they prevent future regressions.
+4. 提炼，不做原文堆砌：
+   - 临时调试细节放到 worklog，不放进 PRD。
+   - PRD 只保留当前有效行为。
+   - 只有当旧决策能防止未来复发时，才保留已被替代的背景。
 
-5. Update PRD artifacts:
-   - Update or create the module PRD.
-   - Update `docs/prd/README.md` so the module and document paths are discoverable.
-   - Add contract candidates or active contracts under `docs/prd/contracts/`.
+5. 更新 PRD 产物：
+   - 更新或创建模块 PRD。
+   - 更新 `docs/prd/README.md`，确保模块和文档路径可发现。
+   - 在 `docs/prd/contracts/` 下添加合同候选或生效合同。
 
-6. Validate:
-   - Run `scripts/prd_distill.py check --root <repo>`.
-   - Ensure active contracts cite PRD section, tests, and runtime evidence.
-   - Run project-specific tests if implementation was changed.
+6. 验证：
+   - 运行 `scripts/prd_distill.py check --root <repo>`。
+   - 确认生效合同关联 PRD 章节、测试和运行证据。
+   - 如果实现有变更，运行项目自身相关测试。
 
-## Contracts
+## 约束合同
 
-Treat contracts as the executable constraint layer of PRDs, not as a separate system.
+把合同视为 PRD 的可执行约束层，而不是独立系统。
 
-Write a **draft contract** when the user gives strong constraints:
+当用户给出强约束时，先写 **草稿合同**：
 
 ```text
 必须 / 不能 / 每个 / 一定 / 不能靠猜 / 之前解决过又复现 / 为什么会没有
 ```
 
-Promote a draft to an **active contract** only when at least one is true:
+只有满足至少一个条件时，才提升为 **生效合同**：
 
-- The root cause is confirmed.
-- The behavior is stable enough to become a long-term rule.
-- A regression would be expensive or high-risk.
+- 根因已经确认。
+- 行为足够稳定，可以成为长期规则。
+- 回归代价高或风险高。
 
-An active contract must include:
+生效合同必须包含：
 
-- ID and title
-- Type: field, decision, runtime, quality, safety, API, or UX
-- Linked PRD section
-- Requirement
-- Field/source contract if relevant
-- Failure handling
-- Test binding
-- Runtime/log evidence
-- Status
+- ID 和标题
+- 类型：field、decision、runtime、quality、safety、API 或 UX
+- 关联 PRD 章节
+- 要求
+- 相关字段/来源合同
+- 失败处理
+- 测试绑定
+- 运行/日志证据
+- 状态
 
-Use `scripts/prd_distill.py new-contract ...` to create draft contracts.
+使用 `scripts/prd_distill.py new-contract ...` 创建草稿合同。
 
 ## Claude Code Hooks
 
-This skill includes optional Claude Code hook scripts for stricter automation:
+这个 skill 包含可选的 Claude Code hook 脚本，用于更严格的自动化：
 
-- `scripts/claude_hooks/harvest_prd_prompt.py`: capture strong user requirement fragments into `docs/prd/inbox/`.
-- `scripts/claude_hooks/guard_prd_commit.py`: block `git commit` when PRD or contract inbox drafts are pending.
+- `scripts/claude_hooks/harvest_prd_prompt.py`：把强需求片段收集到 `docs/prd/inbox/`。
+- `scripts/claude_hooks/guard_prd_commit.py`：当 PRD 或合同 inbox 草稿待处理时，阻止 `git commit`。
 
-Read `references/claude-code-hooks.md` before installing hooks.
+安装 hooks 前先阅读 `references/claude-code-hooks.md`。
 
-Codex does not use Claude Code hooks. In Codex sessions, run the skill workflow directly and use `scripts/prd_distill.py check --root <repo>` before committing.
+Codex 不使用 Claude Code hooks。在 Codex 会话中，直接运行 skill 工作流，并在提交前运行 `scripts/prd_distill.py check --root <repo>`。
 
-## Guardrails
+## 约束
 
-- Do not make `context-keeper` depend on this skill.
-- Do not turn every user sentence into an active PRD change.
-- Do not formalize ambiguous or disputed ideas; put them in inbox.
-- Do not create contracts without tests or runtime evidence unless marked `draft`.
-- Do not place contracts beside `docs/prd`; keep them under `docs/prd/contracts/`.
-- Prefer module-based contract docs such as `docs/prd/contracts/xhs-local-collector.md` over type-based global files.
+- 不要让 `context-keeper` 依赖这个 skill。
+- 不要把用户每句话都变成生效 PRD 变更。
+- 不要正式化模糊或仍有争议的想法；先放进 inbox。
+- 没有测试或运行证据时，不要创建生效合同，只能标记为草稿。
+- 不要把合同放在 `docs/prd` 平级；必须放在 `docs/prd/contracts/` 下。
+- 优先使用模块级合同文档，例如 `docs/prd/contracts/xhs-local-collector.md`，不要按类型创建全局合同文件。

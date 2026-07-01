@@ -84,7 +84,7 @@ def main() -> int:
             fh.write(f"# PRD 需求碎片 - {today}\n\n")
         fh.write(f"## {now}\n\n")
         fh.write(f"- **触发词：** {', '.join(hits)}\n")
-        fh.write("- **状态：** inbox\n")
+        fh.write("- **状态：** 待处理\n")
         fh.write("- **原文：**\n\n")
         fh.write("```text\n")
         fh.write(snippet)

@@ -13,6 +13,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_SKILL = REPO_ROOT / "skills" / "prd-distill"
 
 
+_ARGPARSE_TRANSLATIONS = {
+    "usage: ": "用法：",
+    "options": "选项",
+    "optional arguments": "选项",
+    "show this help message and exit": "显示帮助并退出",
+    "the following arguments are required: %s": "缺少必填参数：%s",
+}
+
+argparse._ = lambda text: _ARGPARSE_TRANSLATIONS.get(text, text)
+
+
 def _home() -> Path:
     return Path(os.environ.get("HOME") or str(Path.home())).expanduser().resolve()
 
@@ -117,15 +128,15 @@ def _install_claude_hooks(project: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Install prd-distill for installed Codex and Claude Code runtimes"
+        description="为本机已安装的 Codex 和 Claude Code 安装 prd-distill"
     )
-    parser.add_argument("--all", action="store_true", help="force install to Codex and Claude Code global skills directories")
-    parser.add_argument("--codex", action="store_true", help="install to Codex skills directory")
-    parser.add_argument("--codex-dir", help="override Codex skills directory")
-    parser.add_argument("--claude", action="store_true", help="install to Claude Code global skills directory")
-    parser.add_argument("--claude-dir", help="override Claude Code global skills directory")
-    parser.add_argument("--claude-project", help="install to <project>/.claude/skills")
-    parser.add_argument("--install-claude-hooks", action="store_true", help="install Claude Code hooks into --claude-project")
+    parser.add_argument("--all", action="store_true", help="强制安装到 Codex 和 Claude Code 的全局 skills 目录")
+    parser.add_argument("--codex", action="store_true", help="安装到 Codex skills 目录")
+    parser.add_argument("--codex-dir", help="指定 Codex skills 目录")
+    parser.add_argument("--claude", action="store_true", help="安装到 Claude Code 全局 skills 目录")
+    parser.add_argument("--claude-dir", help="指定 Claude Code 全局 skills 目录")
+    parser.add_argument("--claude-project", help="安装到 <project>/.claude/skills")
+    parser.add_argument("--install-claude-hooks", action="store_true", help="把 Claude Code hooks 安装到 --claude-project")
     return parser
 
 
@@ -153,7 +164,7 @@ def main() -> int:
             args.codex = True
             args.claude = True
     if args.install_claude_hooks and not args.claude_project:
-        raise SystemExit("--install-claude-hooks requires --claude-project")
+        raise SystemExit("--install-claude-hooks 需要同时指定 --claude-project")
 
     if args.codex:
         installed.append(str(_copy_skill(Path(args.codex_dir) if args.codex_dir else _default_codex_dir())))
@@ -167,7 +178,7 @@ def main() -> int:
             installed.append(str(project / ".claude" / "hooks"))
 
     if not installed:
-        raise SystemExit("nothing to install; pass --codex, --claude, or --claude-project")
+        raise SystemExit("没有可安装目标；请传入 --codex、--claude 或 --claude-project")
 
     print(json.dumps({
         "mode": "explicit" if explicit else "auto",

@@ -6,7 +6,7 @@
 
 - 合同必须放在 `docs/prd/contracts/` 下。
 - 草稿放在 `docs/prd/contracts/inbox/`。
-- active 合同必须关联 PRD 章节、测试和运行证据。
+- 生效合同必须关联 PRD 章节、测试和运行证据。
 - 合同按模块归档，例如 `xhs-local-collector.md`。
 
 ## 模块合同

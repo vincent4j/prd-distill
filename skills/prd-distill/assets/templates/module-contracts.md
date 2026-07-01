@@ -4,14 +4,14 @@
 
 - 主 PRD：
 - 技术 PRD：
-- Invariants：
+- 不变量：
 
 ## 合同列表
 
 ### {{contract_id}}：{{contract_title}}
 
 - **类型：** {{contract_type}}
-- **状态：** active
+- **状态：** 生效
 - **来源：**
 - **PRD 章节：**
 - **要求：**
