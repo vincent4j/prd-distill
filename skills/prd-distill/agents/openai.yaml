@@ -1,4 +1,4 @@
 interface:
   display_name: "PRD Distill"
-  short_description: "把聊天碎片和每日 plans 提炼为模块 PRD、合同和验收标准"
+  short_description: "把聊天碎片和每日 plans 提炼为模块 PRD、约束合同和验收标准"
   default_prompt: "Use $prd-distill to distill recent plans, worklogs, and implementation changes into module PRDs and contracts."

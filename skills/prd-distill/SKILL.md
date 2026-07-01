@@ -1,6 +1,6 @@
 ---
 name: prd-distill
-description: Distill fragmented chat requirements, daily plans, worklogs, implementation diffs, and user corrections into module-level PRDs, docs/prd module indexes, and executable contracts under docs/prd/contracts. Use when the user invokes /prd-distill or $prd-distill, asks to 整理 PRD, 同步 plans 到 PRD, 提炼需求, 归并需求, 检查 PRD 和实现一致性, 生成/更新合同, or when starting implementation after many requirement fragments or strong constraints like 必须/不能/每个/之前解决过又复现.
+description: Distill fragmented chat requirements, daily plans, worklogs, implementation diffs, and user corrections into module-level PRDs, docs/prd module indexes, and executable contracts under docs/prd/contracts. Use when the user invokes /prd-distill or $prd-distill, asks to 整理 PRD, 同步 plans 到 PRD, 提炼需求, 归并需求, 检查 PRD 和实现一致性, 生成/更新合同, or before git commit / 保存并提交 when PRD and contract closeout may be needed after requirement-heavy work.
 ---
 
 # PRD Distill
@@ -34,7 +34,7 @@ When the user invokes `/prd-distill`, `$prd-distill`, or names this skill withou
 PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 1. 提炼 PRD
-2. 整理需求合同
+2. 整理约束合同
 3. 检查实现与文档是否一致
 
 请选择操作（输入 1-3）：
@@ -49,7 +49,7 @@ Handle choices as follows:
    - Update the module PRD and `docs/prd/README.md`.
    - Run `scripts/prd_distill.py check --root <repo>`.
 
-2. **整理需求合同**
+2. **整理约束合同**
    - Inspect strong constraints in user messages, `docs/prd/inbox/`, recent plans/worklogs, and existing contracts.
    - Create draft contracts with `scripts/prd_distill.py new-contract ...` when the constraint is not yet stable.
    - Promote to active module contract only when the requirement, failure handling, test binding, and runtime/log evidence are clear.
@@ -58,6 +58,22 @@ Handle choices as follows:
    - Run `scripts/prd_distill.py check --root <repo>`.
    - Compare active contracts with linked PRD sections and current implementation when relevant.
    - Report missing PRD links, missing tests, missing runtime evidence, stale inbox drafts, and implementation drift.
+
+## Commit Closeout
+
+When the user asks to commit, save and commit, push, or when the agent is about to run `git commit`, run PRD Distill closeout **before** the commit:
+
+1. Run `scripts/prd_distill.py scan --root <repo>` and inspect pending PRD/contract inbox drafts.
+2. If requirement fragments, strong constraints, or PRD-impacting implementation changes are present, run the relevant menu action first:
+   - Use **提炼 PRD** for module behavior, workflows, fields, acceptance criteria, and changed decisions.
+   - Use **整理约束合同** for hard constraints that must be tested or evidenced.
+   - Use **检查实现与文档是否一致** before the final commit attempt.
+3. Stage generated or updated PRD/contract files with the code changes.
+4. Commit once, with code and PRD/contract closeout in the same commit.
+
+Do not generate PRD or contract files after a successful commit. If the closeout discovers missing docs after committing but before pushing, amend the same commit. If the commit was already pushed, create a follow-up commit only with explicit user approval.
+
+Claude Code hooks may block `git commit` when pending PRD/contract drafts exist. Treat that block as a pre-commit reminder to run this skill and include the resulting docs in the same commit.
 
 ## Document Model
 

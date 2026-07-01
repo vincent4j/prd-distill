@@ -62,8 +62,9 @@ Copy or reference the scripts from project `.claude/settings.json`.
 
 - Runs on Bash tool calls and exits without action unless the command is a `git commit`.
 - Blocks commits when `docs/prd/inbox/*.md` or `docs/prd/contracts/inbox/*.md` contains pending drafts.
+- The block is intentionally pre-commit. Run `/prd-distill`, stage generated PRD/contract docs with code, then retry the commit.
 - Set `PRD_DISTILL_ALLOW_PENDING=1` to bypass intentionally.
 
 ## Safety
 
-Hooks should capture and block only. They should not rewrite active PRD files automatically. Promotion from inbox to active PRD/contracts remains an agent/user decision.
+Hooks should capture and block only. They should not rewrite active PRD files automatically and should not generate docs after a commit. Promotion from inbox to active PRD/contracts remains an agent/user decision before the final commit.

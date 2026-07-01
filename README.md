@@ -67,7 +67,7 @@ Claude Code：
 PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 1. 提炼 PRD
-2. 整理需求合同
+2. 整理约束合同
 3. 检查实现与文档是否一致
 
 请选择操作（输入 1-3）：
@@ -88,3 +88,16 @@ docs/prd/contracts/inbox/
 skills/prd-distill/       # Codex 和 Claude Code 共用的 Skill 包
 scripts/install.py        # 手动安装器
 ```
+
+## 提交前收尾
+
+`prd-distill` 的收尾应该发生在 `git commit` 之前，而不是提交之后。
+
+推荐流程：
+
+1. 先运行 `/prd-distill` 或 `[$prd-distill]`。
+2. 按需要提炼 PRD、整理约束合同、检查实现与文档是否一致。
+3. 把生成或更新的 `docs/prd/**` 文件和代码一起 `git add`。
+4. 再执行 `git commit`。
+
+这样 PRD / 合同文档会和代码进入同一个提交，不需要提交后再补一次 md。
