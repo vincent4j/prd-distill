@@ -80,7 +80,7 @@ PRD = 完整模块规格
 
 | 模块 | 说明 | 主 PRD | 合同 / 不变量 | 相关 plans |
 |---|---|---|---|---|
-| 小红书本地采集 | 本地客户端驱动真实账号采集小红书内容 | [strategy-collector-xhs.md](strategy-collector-xhs.md) | [contracts/xhs-local-collector.md](contracts/xhs-local-collector.md) | [../plans/...](../plans/...) |
+| <模块名> | <模块职责和边界> | [<module-prd>.md](<module-prd>.md) | [contracts/<module>.md](contracts/<module>.md) | [../plans/...](../plans/...) |
 ```
 
 `docs/prd/README.md` 是模块开发的入口。后续 agent 开发模块功能、修复模块 bug、或遇到陌生模块术语时，先用关键词、文件名、接口名、字段名、错误现象或合同 ID 检索这个索引，只读取命中行和相邻上下文来定位主 PRD 与合同文件，再继续局部读取相关章节 / 合同条目。不要默认全文加载 README、大型 PRD 或合同文件。
@@ -94,24 +94,23 @@ PRD = 完整模块规格
 
 - 主 PRD：../<module-prd>.md
 - 技术 PRD：../<tech-prd>.md
-- 不变量：../collector-invariants.md
+- 不变量：../<module-invariants>.md
 
 ## 合同列表
 
-### XHS-FIELD-001：预选候选必须包含标题和有效封面
+### MOD-FIELD-001：关键输入必须来自权威数据源
 
 - **类型：** field
 - **状态：** 生效
-- **来源：** 用户要求 / 真实账号联调
-- **PRD 章节：** ../strategy-collector-xhs.md#专业模型预选输入合同
-- **要求：** 进入专业模型预选的候选必须包含 `title` 和有效 `cover_url`。
+- **来源：** 用户要求 / 运行联调
+- **PRD 章节：** ../<module-prd>.md#<section>
+- **要求：** 进入核心流程的记录必须包含 `<required_field>`，且该字段必须来自 `<authoritative_source>`。
 - **字段来源：**
-  - `title`：列表 DOM 当前卡片标题
-  - `cover_url`：列表 DOM 当前卡片主封面图
-- **禁止：** LLM 生成 `cover_url`；用 `cover_text` 替代 `cover_url`
+  - `<required_field>`：`<authoritative_source>`
+- **禁止：** 用推测值、派生临时值或非权威来源替代 `<required_field>`
 - **失败处理：** 记录缺字段原因，跳过预选
 - **测试：** `tests/...::test_...`
-- **运行证据：** 运行日志显示缺封面候选被跳过
+- **运行证据：** 运行日志显示缺字段记录被跳过
 ```
 
 ## 提升规则
