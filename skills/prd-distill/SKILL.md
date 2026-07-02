@@ -16,7 +16,7 @@ description: "把需求碎片提炼成 PRD 和约束合同"
   -> docs/prd/contracts/<module>.md 约束合同
 ```
 
-保持 `context-keeper` 独立。这个 skill 可以读取 `context-keeper` 生成的 `docs/plans/`、`docs/worklog/` 和 `docs/lessons-learned.md`，但不能依赖它才能工作。
+保持 `context-keeper` 独立。PRD Distill 不要求先安装或运行 `context-keeper`；如果项目里已经存在 `docs/plans/`、`docs/worklog/` 或 `docs/memory-keeper.md`，可以把它们作为按需输入，但没有这些文件时仍然必须能基于用户消息、`git diff`、现有 PRD / 合同和 inbox 草稿工作。
 
 同时支持 Codex 和 Claude Code：
 
@@ -44,13 +44,13 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 1. **提炼 PRD**
    - 运行 `scripts/prd_distill.py scan --root <repo>`，发现待处理碎片。
-   - 检查近期 `docs/plans/`、`docs/worklog/`、已有模块 PRD 和相关 `git diff`。
+   - 检索近期 `docs/plans/`、`docs/worklog/`、已有模块 PRD 和相关 `git diff`，只读取与目标模块命中的内容。
    - 只有在无法推断目标模块时才询问用户。
    - 更新模块 PRD 和 `docs/prd/README.md`。
    - 运行 `scripts/prd_distill.py check --root <repo>`。
 
 2. **整理约束合同**
-   - 检查用户消息、`docs/prd/inbox/`、近期 plans/worklogs 和已有合同中的强约束。
+   - 检查用户消息、`docs/prd/inbox/`、近期 plans/worklogs、`docs/memory-keeper.md` 的“合同候选”和已有合同中的强约束；优先检索模块名和触发词，只读命中条目。
    - 当约束还不稳定时，用 `scripts/prd_distill.py new-contract ...` 创建草稿合同。
    - 只有当要求、失败处理、测试绑定、运行/日志证据都清楚时，才提升为生效模块合同。
 
@@ -71,7 +71,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 3. 将生成或更新的 PRD / 合同文件和代码变更一起 stage。
 4. 只提交一次，让代码和 PRD / 合同收尾进入同一个 commit。
 
-如果本轮会话刚运行过 `context-keeper`，或当前变更里出现新的 `docs/plans/`、`docs/worklog/`、`docs/lessons-learned.md`，并且用户要求提交、保存并提交或推送，必须把这些文件视为 PRD Distill 输入：先读取其中与本轮模块相关的内容，完成 PRD / 合同收尾，再提交。不要让 `context-keeper` 生成的 plans/worklog 单独提交而未检查是否需要提炼到 `docs/prd/`。
+如果本轮会话刚运行过 `context-keeper`，或当前变更里出现新的 `docs/plans/`、`docs/worklog/`、`docs/memory-keeper.md`，并且用户要求提交、保存并提交或推送，必须把这些文件视为 PRD Distill 输入：先用本轮模块名、触发词、文件名和合同候选检索，只读取相关内容，判断是否需要进入 PRD / 合同草稿或生效合同，再提交。不要让 `context-keeper` 生成的 plans/worklog/memory 单独提交而未检查是否需要提炼到 `docs/prd/`。
 
 这是正常路径。不要等 `git commit` hook 失败后才开始 PRD 收尾。
 
@@ -84,14 +84,15 @@ Claude Code 全局 hooks 可能会在存在 PRD / 合同草稿时阻止 `git com
 当用户要求开发已有模块的新功能、修复模块 bug、调整模块行为，或提到当前会话不熟悉的模块概念时，先把 PRD Distill 当作模块入场检查使用：
 
 1. **定位模块**
-   - 如果存在 `docs/prd/README.md`，先读取模块索引。
-   - 根据用户提到的模块名、术语、接口、页面、数据字段、受影响文件或 `git diff` 匹配模块。
+   - 如果存在 `docs/prd/README.md`，先用用户提到的模块名、术语、接口、页面、数据字段、受影响文件或 `git diff` 关键词检索模块索引。
+   - 只读取命中的索引行和相邻上下文，用来定位模块、主 PRD 和合同文件。
    - 如果多个模块同样可能，先问用户确认；不要在没确认的情况下猜模块边界。
 
 2. **索引与按需读取**
-   - 先不要全文加载大型 PRD 或合同文件。
-   - 根据模块索引找到主 PRD 和合同文件路径。
+   - 不要默认全文加载大型 PRD、合同、worklog 或 memory 文件。
+   - 根据模块索引命中结果找到主 PRD 和合同文件路径。
    - 使用关键词、受影响文件名、接口名、字段名、页面名、合同 ID 或近义词，在 PRD / 合同中检索相关章节。
+   - 如果存在 `docs/memory-keeper.md`，只在 bug、回归、用户说“以前遇到过”、高风险模块或 PRD 命中不足时，用当前模块名、错误现象、字段名、接口名、文件名、模型名和合同 ID 等关键词检索相关条目；命中的内容只作为历史经验和合同候选，生效约束仍以 `docs/prd/contracts/` 为准。没有 `memory-keeper.md` 时直接跳过，不要求用户安装 context-keeper。
    - 只读取命中的章节、相邻上下文和相关合同条目。
    - 只有命中不明确、改动跨模块、触碰核心流程 / 数据字段 / 安全边界、或合同冲突时，才扩大读取范围。
    - 如果用户提到陌生概念，先在模块索引、模块 PRD 和合同中搜索该词和近义词；只有文档里找不到时才问用户解释。
@@ -114,6 +115,7 @@ Claude Code 全局 hooks 可能会在存在 PRD / 合同草稿时阻止 `git com
 
 - `docs/plans/`：按日期/会话保存的原始需求碎片。
 - `docs/worklog/`：实际做了什么，以及为什么这么做。
+- `docs/memory-keeper.md`：历史经验、触发词和合同候选；用于辅助检索，不是生效约束来源。
 - `docs/prd/*.md`：当前有效的模块级产品或技术事实。
 - `docs/prd/README.md`：模块索引，映射模块、PRD 和合同文档。
 - `docs/prd/contracts/`：带测试和运行证据的硬约束。
@@ -124,18 +126,20 @@ Claude Code 全局 hooks 可能会在存在 PRD / 合同草稿时阻止 `git com
 ## 工作流
 
 1. 发现仓库结构：
-   - 检查 `docs/prd/`、`docs/plans/`、`docs/worklog/` 和近期 `git diff`。
+   - 检查 `docs/prd/` 是否存在，并用文件列表或索引命中结果了解结构；不要为了发现结构而全文读取。
+   - `docs/plans/`、`docs/worklog/` 和 `docs/memory-keeper.md` 开发前不默认读取，只有继续上下文、提交前收尾、命中不足或用户要求时才按关键词检索。
    - 如果 PRD 结构缺失，运行 `scripts/prd_distill.py init --root <repo>`；该命令会同时安装项目入口桥接规则。
    - 如果 PRD 结构已存在但项目入口文件缺少 PRD Distill 受控块，运行 `scripts/prd_distill.py install-bridge --root <repo>`。
 
 2. 识别模块：
-   - 优先使用 `docs/prd/README.md` 里的已有模块名。
+   - 优先用关键词检索 `docs/prd/README.md` 里的已有模块名。
    - 否则从用户请求和受影响文件推断短模块名。
    - 只有多个模块同样合理时才询问用户。
 
 3. 收集输入：
-   - 与模块相关的近期 plans / worklogs。
-   - 现有模块 PRD 和合同文档。
+   - 与模块相关的近期 plans / worklogs；先检索文件名、标题和快速摘要，只在需要判断规则来源时读取相关段落。
+   - 如果存在 `docs/memory-keeper.md`，只读取按模块名、触发词或当前问题命中的历史经验和合同候选；不存在则跳过。
+   - 现有模块 PRD 和合同文档中的命中章节。
    - 用户纠正、被拒绝方案、强约束和实现 diff。
 
 4. 提炼，不做原文堆砌：
@@ -146,7 +150,7 @@ Claude Code 全局 hooks 可能会在存在 PRD / 合同草稿时阻止 `git com
 5. 更新 PRD 产物：
    - 更新或创建模块 PRD。
    - 更新 `docs/prd/README.md`，确保模块和文档路径可发现。
-   - 在 `docs/prd/contracts/` 下添加合同候选或生效合同。
+   - 将 `memory-keeper.md` 中成熟的合同候选提炼到 `docs/prd/contracts/inbox/` 或生效模块合同；不成熟的继续留作历史经验。
 
 6. 验证：
    - 运行 `scripts/prd_distill.py check --root <repo>`。
@@ -195,7 +199,7 @@ Claude Code 全局 hooks 可能会在存在 PRD / 合同草稿时阻止 `git com
 - 使用 `<!-- prd-distill:start -->` 和 `<!-- prd-distill:end -->` 包住受控块；重复运行时只替换这个受控块，不要改写文件里的其他项目规则。
 - 如果项目原有规则与 PRD / 合同桥接规则冲突，先向用户说明冲突并确认，不要自行覆盖原规则。
 
-桥接规则的职责只限于告诉 Codex / Claude Code 在开发已有模块、修复模块 bug、遇到陌生模块术语时，先去 `docs/prd/` 检索模块 PRD 和合同。不要把正式 PRD 或合同正文复制到 `AGENTS.md` / `CLAUDE.md`。
+桥接规则的职责只限于告诉 Codex / Claude Code 在开发已有模块、修复模块 bug、遇到陌生模块术语时，先去 `docs/prd/` 检索模块 PRD 和合同，并在存在 `docs/memory-keeper.md` 时把它作为历史经验和合同候选的辅助检索源。不要把正式 PRD、合同正文或 memory 条目复制到 `AGENTS.md` / `CLAUDE.md`。
 
 ## Claude Code Hooks
 

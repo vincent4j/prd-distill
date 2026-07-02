@@ -19,7 +19,9 @@ PRD Distill 的目标是做中间那层“蒸馏”：
 2. 把高风险、必须验证的规则整理成约束合同。
 3. 在提交代码前提醒 agent 把文档和实现一起收尾。
 
-它可以和 [`context-keeper`](https://github.com/vincent4j/context-keeper) 配合：`context-keeper` 负责保存每日 plans / worklog，PRD Distill 负责把这些材料继续提炼成长期有效的模块 PRD。
+它可以和 [`context-keeper`](https://github.com/vincent4j/context-keeper) 配合：`context-keeper` 负责保存每日 plans / worklog / memory-keeper，PRD Distill 负责把这些材料继续提炼成长期有效的模块 PRD 和约束合同。
+
+PRD Distill 不要求先安装或运行 `context-keeper`。如果项目里没有 `docs/memory-keeper.md`、`docs/plans/` 或 `docs/worklog/`，它仍然可以基于用户消息、`git diff`、现有 PRD / 合同和 inbox 草稿工作；这些 context-keeper 文件只是可选输入。
 
 ## 适合什么场景
 
@@ -31,9 +33,9 @@ PRD Distill 的目标是做中间那层“蒸馏”：
 ## 功能
 
 - **提炼 PRD**：读取聊天上下文、`docs/plans/`、`docs/worklog/`、已有 PRD 和 `git diff`，更新模块级 PRD。
-- **整理约束合同**：把“必须 / 不能 / 每个 / 之前解决过又复现”这类强约束，沉淀到 `docs/prd/contracts/`。
+- **整理约束合同**：把“必须 / 不能 / 每个 / 之前解决过又复现”这类强约束，以及 `docs/memory-keeper.md` 里的合同候选，沉淀到 `docs/prd/contracts/`。
 - **检查实现与文档是否一致**：提交前检查 PRD、合同、测试和运行证据是否对齐。
-- **开发前学习模块上下文**：后续开发同一模块时，先从 `docs/prd/README.md` 定位模块，再按关键词检索相关 PRD 章节和合同条目。
+- **开发前学习模块上下文**：后续开发同一模块时，先用关键词检索 `docs/prd/README.md` 定位模块，再局部读取相关 PRD 章节、合同条目，以及 `docs/memory-keeper.md` 中命中的历史经验和合同候选。
 - **保护既有合同不回归**：改代码前识别受影响合同，改完后按受影响合同条目逐条回归验证，避免把原本正确的行为改坏。
 - **Claude Code 自动化**：默认安装全局 hooks，支持聊天时自动收集强需求片段，以及提交前拦截未收尾的 PRD / 合同草稿。
 
@@ -51,13 +53,16 @@ PRD Distill 保存 PRD / 合同，不只是为了归档。更重要的是让后�
 - 只存在一个时，只写入已有文件。
 - 两个都不存在时，默认创建两个。
 
-这段桥接规则只告诉 agent “开发前要去 `docs/prd/` 查模块 PRD 和合同”，真正的 PRD / 合同内容仍然只保存在 `docs/prd/`，不会复制成两份。
+这段桥接规则只告诉 agent “开发前用检索方式去 `docs/prd/` 查模块 PRD 和合同，并在需要时把 `docs/memory-keeper.md` 作为辅助检索源”，真正的 PRD / 合同内容仍然只保存在 `docs/prd/`，不会复制成两份。
 
-当你提出一个新需求，例如“优化小红书本地采集的质量评分”或“改一下洞察加载逻辑”时，agent 应该先做三件事：
+当你提出一个新需求，例如“优化小红书本地采集的质量评分”或“改一下洞察加载逻辑”时，agent 应该先做这些事：
 
-1. 从 `docs/prd/README.md` 找到对应模块。
-2. 用关键词、文件名、接口名、字段名或合同 ID，在模块 PRD 和 `docs/prd/contracts/<module>.md` 中检索相关章节。
-3. 只读取命中的章节、相邻上下文和相关合同条目，再把本次改动可能影响的合同列出来。
+1. 用模块名、业务词、文件名、接口名、字段名、错误现象或合同 ID 检索 `docs/prd/README.md`，只读命中上下文来定位模块。
+2. 在模块 PRD 和 `docs/prd/contracts/<module>.md` 中继续检索相关章节，只读命中章节和相邻上下文。
+3. 如果存在 `docs/memory-keeper.md`，只在 bug、回归、相似问题、高风险模块或 PRD 命中不足时检索相关历史经验和合同候选；不存在就跳过，不要求安装 context-keeper。
+4. 命中不清、跨模块或触碰核心流程 / 数据 / 安全边界时才扩大读取，再把本次改动可能影响的合同列出来。
+
+`memory-keeper.md` 是辅助检索源：它帮助 agent 想起历史经验和待提炼的合同候选，但真正的硬约束仍然以 `docs/prd/contracts/` 下的生效合同为准。
 
 如果你提到一个当前会话里陌生的概念，agent 不应该先猜，也不应该马上问你重复解释；它应该先去模块 PRD 和合同里搜索这个词，理解它在项目里的定义。只有文档里找不到时，才向你确认。
 
@@ -215,18 +220,18 @@ docs/
 
 `context-keeper` 和 `prd-distill` 不是替代关系，而是上下游关系。
 
-- `context-keeper` 记录“今天发生了什么”：它按天保存对话上下文、plans、worklog 和经验摘要，保留当天的原始背景。
-- `prd-distill` 提炼“长期应该遵守什么”：它把多天、多轮对话里的需求碎片，按功能模块归并成 PRD，并把必须验证的规则整理成约束合同。
+- `context-keeper` 记录“今天发生了什么”：它按天保存对话上下文、plans、worklog 和 `memory-keeper.md`，保留当天的原始背景、触发词、关键经验和合同候选。
+- `prd-distill` 提炼“长期应该遵守什么”：它把多天、多轮对话里的需求碎片和 memory 中的合同候选，按功能模块归并成 PRD，并把必须验证的规则整理成约束合同。
 
 推荐节奏是：
 
-1. 工作结束时，用 `context-keeper` 保存当天上下文。
-2. 当某个模块的需求逐渐稳定，或准备提交代码时，用 PRD Distill 把近期碎片提炼进 `docs/prd/`。
+1. 工作结束时，用 `context-keeper` 保存当天上下文，更新 `docs/memory-keeper.md`。
+2. 当某个模块的需求逐渐稳定，或准备提交代码时，用 PRD Distill 把近期碎片和 memory 里的合同候选提炼进 `docs/prd/`。
 3. 后续 agent 不需要翻完整聊天记录，只看模块 PRD 和约束合同，就能知道当前有效规则。
 
-如果两个 skill 都安装在 Claude Code 中，同一会话里最顺的顺序是：先运行 `context-keeper` 生成 `docs/plans/` 和 `docs/worklog/`，再运行 `/prd-distill` 提炼稳定需求，最后再提交。这样全局 hooks 在提交前看到的就是已经收尾的状态，不会因为待处理 PRD / 合同草稿而阻止提交。
+如果两个 skill 都安装在 Claude Code 中，同一会话里最顺的顺序是：先运行 `context-keeper` 生成 `docs/plans/`、`docs/worklog/` 和 `docs/memory-keeper.md`，再运行 `/prd-distill` 提炼稳定需求和合同候选，最后再提交。这样全局 hooks 在提交前看到的就是已经收尾的状态，不会因为待处理 PRD / 合同草稿而阻止提交。
 
-你可以只安装 PRD Distill；如果项目里已经有 `context-keeper` 生成的 `docs/plans/` 和 `docs/worklog/`，PRD Distill 会把它们当作更稳定的输入材料。
+你可以只安装 PRD Distill；如果项目里已经有 `context-keeper` 生成的 `docs/plans/`、`docs/worklog/` 或 `docs/memory-keeper.md`，PRD Distill 会把它们当作更稳定的输入材料。没有这些文件时，PRD Distill 仍按自己的 PRD / 合同工作流运行。
 
 ## 提交前收尾
 

@@ -5,7 +5,7 @@
 ```text
 docs/plans/                  # 每日/会话需求碎片，通常来自 context-keeper
 docs/worklog/                # 每日/会话执行记录
-docs/lessons-learned.md      # 跨会话经验教训
+docs/memory-keeper.md        # 跨会话历史经验、触发词和合同候选（可选）
 
 docs/prd/
   README.md                  # 模块索引
@@ -24,7 +24,7 @@ AGENTS.md                    # Codex / OpenAI agents 常驻项目规则
 CLAUDE.md                    # Claude Code 常驻项目规则
 ```
 
-`AGENTS.md` 和 `CLAUDE.md` 不是 PRD 正文，也不是合同来源。它们只保存 PRD Distill 的受控桥接块，让新会话知道开发前要去 `docs/prd/` 查模块 PRD 和合同。
+`AGENTS.md` 和 `CLAUDE.md` 不是 PRD 正文，也不是合同来源。它们只保存 PRD Distill 的受控桥接块，让新会话知道开发前要去 `docs/prd/` 查模块 PRD 和合同，并在存在 `docs/memory-keeper.md` 时把它作为历史经验和合同候选的辅助检索源。
 
 写入策略：
 
@@ -43,6 +43,18 @@ CLAUDE.md                    # Claude Code 常驻项目规则
 
 ```text
 聊天碎片 -> 每日 plans -> 模块 PRD
+```
+
+## memory-keeper 和 PRD 的边界
+
+`docs/memory-keeper.md` 是可选的历史经验索引，通常由 context-keeper 维护。PRD Distill 不要求安装 context-keeper；没有该文件时直接跳过 memory 检索。该文件可以包含模块、触发词、任务、关键经验和合同候选，用于帮助后续 agent 快速想起类似问题。
+
+`memory-keeper.md` 不是生效约束来源。命中的条目只能作为排查线索和合同候选；需要长期保护的规则必须经过 PRD Distill 提炼，进入 `docs/prd/contracts/inbox/` 或生效模块合同。
+
+转换关系：
+
+```text
+worklog / memory-keeper 合同候选 -> contracts/inbox 草稿 -> 生效模块合同
 ```
 
 ## 约束合同和 PRD 的关系
@@ -71,7 +83,7 @@ PRD = 完整模块规格
 | 小红书本地采集 | 本地客户端驱动真实账号采集小红书内容 | [strategy-collector-xhs.md](strategy-collector-xhs.md) | [contracts/xhs-local-collector.md](contracts/xhs-local-collector.md) | [../plans/...](../plans/...) |
 ```
 
-`docs/prd/README.md` 是模块开发的入口。后续 agent 开发模块功能、修复模块 bug、或遇到陌生模块术语时，必须先通过这个索引定位主 PRD 和合同文件，再用关键词、文件名、接口名、字段名或合同 ID 检索并局部读取相关章节 / 合同条目。不要默认全文加载大型 PRD 或合同文件。
+`docs/prd/README.md` 是模块开发的入口。后续 agent 开发模块功能、修复模块 bug、或遇到陌生模块术语时，先用关键词、文件名、接口名、字段名、错误现象或合同 ID 检索这个索引，只读取命中行和相邻上下文来定位主 PRD 与合同文件，再继续局部读取相关章节 / 合同条目。不要默认全文加载 README、大型 PRD 或合同文件。
 
 ## 模块合同格式
 

@@ -16,17 +16,16 @@ BRIDGE_END = "<!-- prd-distill:end -->"
 BRIDGE_CONTENT = f"""{BRIDGE_START}
 ## PRD / 合同约束
 
-当用户要求开发已有模块、修改模块行为、修复模块 bug，或在当前会话中提到未解释过的模块 / 功能 / 业务名词时，先把 `docs/prd/` 当作项目知识库使用。
+开发已有模块、修 bug、改模块行为，或遇到陌生业务名词时，先用检索方式查询项目知识库，不默认全文加载文档。
 
 执行规则：
 
-1. 先读取 `docs/prd/README.md` 模块索引，定位相关模块、主 PRD 和合同文件。
-2. 不要默认全文加载大型 PRD / 合同文档。根据用户提到的关键词、文件名、接口名、字段名、页面名或合同 ID，在相关 PRD / 合同中检索，只读取命中的章节、相邻上下文和相关合同条目。
-3. 如果当前会话不理解某个模块、功能或业务名词，先在 `docs/prd/README.md`、模块 PRD 和 `docs/prd/contracts/` 中搜索学习；文档里找不到时，再向用户确认。
-4. 开始实现前，列出本次改动可能影响的 PRD 规则或生效合同。
-5. 如果新需求与既有 PRD / 合同冲突，停止实现，明确列出冲突点、受影响的 PRD / 合同条目和可能后果，请用户确认是否变更规则。只有用户明确确认后，才能更新 PRD / 合同并继续实现。
-6. 实现完成后，按本次实际影响的合同条目逐条做回归验证：合同条目绑定了测试命令的，必须运行对应测试；合同条目要求运行证据的，必须检查或补充日志、截图、接口响应等证明；如果某个受影响合同暂时无法验证，必须明确说明原因、风险和后续需要补的测试。
-7. 提交前如果本轮产生了 `docs/plans/`、`docs/worklog/`、`docs/lessons-learned.md`，或存在 PRD / 合同相关变更，先运行 PRD Distill 收尾，再把代码和文档一起提交。
+1. 用模块名、业务词、文件名、接口名、字段名、错误现象或合同 ID 先检索 `docs/prd/README.md`，只读命中上下文来定位模块、主 PRD 和合同。
+2. 在相关 PRD / 合同中继续关键词检索，只读命中章节和相邻上下文；命中不清、跨模块或触碰核心流程 / 数据 / 安全边界时才扩大读取。
+3. 若有 `docs/memory-keeper.md`，只在 bug / 回归 / 相似问题 / 高风险模块或 PRD 命中不足时检索；命中内容只作历史经验和合同候选，硬约束以 `docs/prd/contracts/` 为准。
+4. 实现前列出本次可能影响的 PRD 规则或生效合同；若需求冲突，先停下请用户确认。
+5. 实现后按受影响合同跑绑定测试或检查运行证据；无法验证时说明风险。
+6. 提交前若本轮改了 `docs/plans/`、`docs/worklog/`、`docs/memory-keeper.md` 或 PRD / 合同，先做 PRD Distill 收尾再提交。
 {BRIDGE_END}
 """
 
@@ -160,6 +159,9 @@ def cmd_scan(args: argparse.Namespace) -> int:
     data = {
         "plans": _list_md(root / "docs" / "plans"),
         "worklogs": _list_md(root / "docs" / "worklog"),
+        "memory_keeper": str(root / "docs" / "memory-keeper.md")
+        if (root / "docs" / "memory-keeper.md").exists()
+        else None,
         "prd": _list_md(root / "docs" / "prd"),
         "prd_inbox": _list_md(root / "docs" / "prd" / "inbox"),
         "contracts": _list_md(root / "docs" / "prd" / "contracts"),
