@@ -29,6 +29,15 @@ description: "把需求碎片、代码变更、历史经验提炼成模块 PRD �
    - 不默认搜索 archive / legacy / history 类目录。
    - 不用 `cat`、大范围 `tail` 或未过滤日志把大型文件正文灌进上下文。
 
+## 测试阶段边界
+
+PRD Distill 里的“测试”默认发生在功能开发完成后的自测阶段，不默认挪到提交前补跑。
+
+- **开发自测阶段**：实现完成后，根据本次功能实际触碰的模块、行为、字段、接口、页面或安全边界，回到相关 PRD / 合同中定位受影响约束；只覆盖这些受影响合同，不按“今天所有 diff 可能相关的合同”扩大测试。
+- **提交前收尾阶段**：提交、保存并提交或推送前，主要做 PRD / 合同 / inbox 草稿收口和一致性检查；默认复用开发自测阶段已经产生的证据，不重复跑合同测试。
+- **需要补测的例外**：没有可追溯自测证据、自测后又改了受影响代码、合同/PRD 发生实质变化、或用户明确要求提交前完整验证时，才在提交前补跑相关测试。
+- **证据落点**：自测完成后，在最终回复中说明受影响合同、验证方式和结果；如有日志、截图、接口响应或大文件证据，先落盘到 `/tmp/<project>-*` 并在回复里给路径。只有项目已有且本轮正在使用 worklog / plans / memory 时，才同步写入这些记录；不要为了本 skill 强行创建 worklog。
+
 ## 任务路由
 
 当用户只调用 `/prd-distill`、`$prd-distill`，或只点名本 skill 但没有给出具体任务时，展示菜单并等待选择：
@@ -46,7 +55,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 - **提炼 PRD**：运行 `scripts/prd_distill.py scan --root <repo>`；按模块收窄读取；更新模块 PRD 和 `docs/prd/README.md`；运行 `scripts/prd_distill.py check --root <repo>`。需要文档边界时读 `references/doc-model.md`。
 - **整理约束合同**：读取 `references/contract-rules.md`，再处理合同草稿、生效条件、测试绑定和运行证据。
 - **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。
-- **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`。
+- **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`；提交前默认检查证据与文档收口，不把它理解成重新跑一遍合同测试。
 - **开发前模块入场 / 合同保护**：当用户要求开发已有模块、修 bug、调整模块行为，或提到陌生模块概念时，读取 `references/module-entry-contract-protection.md`。
 - **安装、平台差异或 hooks**：只在用户询问或需要安装/排查时读取 `references/platforms.md` 或 `references/claude-code-hooks.md`。
 
@@ -90,7 +99,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 6. **验证**
    - 运行 `scripts/prd_distill.py check --root <repo>`。
    - 确认生效合同关联 PRD 章节、测试和运行证据。
-   - 如果实现有变更，运行项目自身相关测试。
+   - 如果实现有变更，在开发自测阶段按本次实际影响的 PRD / 合同选择项目相关测试；提交前只确认这些自测证据是否已经覆盖，避免重复执行。
 
 ## 硬约束
 
