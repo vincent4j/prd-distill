@@ -223,6 +223,95 @@ def _active_contract_files(root: Path) -> list[Path]:
     ]
 
 
+def _compile_query(query: str) -> re.Pattern[str]:
+    try:
+        return re.compile(query, re.IGNORECASE)
+    except re.error:
+        return re.compile(re.escape(query), re.IGNORECASE)
+
+
+def _clip(text: str, limit: int = 240) -> str:
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _collect_lookup_candidates(root: Path, include_history: bool) -> list[Path]:
+    candidates: list[Path] = []
+    prd = root / "docs" / "prd"
+    contracts = prd / "contracts"
+
+    for path in (
+        prd / "README.md",
+        *sorted(item for item in prd.glob("*.md") if item.name != "README.md"),
+        contracts / "README.md",
+        *sorted(item for item in contracts.glob("*.md") if item.name != "README.md"),
+    ):
+        if path.exists():
+            candidates.append(path)
+
+    if include_history:
+        memory = root / "docs" / "memory-keeper.md"
+        if memory.exists():
+            candidates.append(memory)
+        for directory in (root / "docs" / "plans", root / "docs" / "worklog"):
+            if directory.exists():
+                candidates.extend(sorted(directory.glob("*.md"), reverse=True))
+    return candidates
+
+
+def _line_hits(path: Path, pattern: re.Pattern[str], limit: int) -> list[dict[str, object]]:
+    hits: list[dict[str, object]] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if pattern.search(line):
+            hits.append({"line": lineno, "text": _clip(line)})
+            if len(hits) >= limit:
+                break
+    return hits
+
+
+def cmd_lookup(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    pattern = _compile_query(args.query)
+    searched: list[str] = []
+    records: list[dict[str, object]] = []
+
+    for path in _collect_lookup_candidates(root, args.include_history):
+        try:
+            rel = str(path.relative_to(root))
+        except ValueError:
+            rel = str(path)
+        searched.append(rel)
+        hits = _line_hits(path, pattern, args.max_matches_per_file)
+        if not hits:
+            continue
+        score = len(hits)
+        if rel == "docs/prd/README.md":
+            score += 100
+        if pattern.search(rel):
+            score += 20
+        records.append({"file": rel, "hits": hits, "_score": score})
+
+    records.sort(key=lambda item: (-int(item["_score"]), str(item["file"])))
+    matches = [
+        {"file": item["file"], "hits": item["hits"]}
+        for item in records[: args.max_files]
+    ]
+
+    print(json.dumps({
+        "root": str(root),
+        "query": args.query,
+        "searched_files": len(searched),
+        "max_files": args.max_files,
+        "max_matches_per_file": args.max_matches_per_file,
+        "include_history": args.include_history,
+        "truncated": len(records) > args.max_files,
+        "matches": matches,
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_pending(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     pending = _pending_files(root)
@@ -275,6 +364,14 @@ def build_parser() -> argparse.ArgumentParser:
     scan = sub.add_parser("scan", help="扫描 PRD 相关文档")
     scan.add_argument("--root", default=".")
     scan.set_defaults(func=cmd_scan)
+
+    lookup = sub.add_parser("lookup", help="窄搜索 PRD / 合同索引与目标文档")
+    lookup.add_argument("--root", default=".")
+    lookup.add_argument("--query", required=True)
+    lookup.add_argument("--max-files", type=int, default=3)
+    lookup.add_argument("--max-matches-per-file", type=int, default=8)
+    lookup.add_argument("--include-history", action="store_true")
+    lookup.set_defaults(func=cmd_lookup)
 
     new_contract = sub.add_parser("new-contract", help="创建合同草稿")
     new_contract.add_argument("--root", default=".")

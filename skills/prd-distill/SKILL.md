@@ -9,16 +9,25 @@ description: "把需求碎片、代码变更、历史经验提炼成模块 PRD �
 
 ## 上下文预算与读取纪律
 
-默认使用渐进式读取：先定位模块，再读取目标段落，最后验证。不要为了“稳妥”宽扫全仓或全文加载大型文档。
+把 `rg` 当索引器，不当正文读取器。默认按三阶段读取：先定位文件，再收窄命中，最后小段读取。
 
-1. 先检索 `docs/prd/README.md` 的命中行，用来确定模块、主 PRD 和合同文件。
-2. 再检索目标 PRD / 合同中的命中章节和相邻上下文。
-3. 只有命中不足、合同冲突、高风险回归或用户明确要求追溯历史时，才读取 plans / worklogs / memory。
-4. 不要把源码目录、测试目录、历史文档目录和全量 docs 一起宽扫。
-5. 不要默认搜索 archive / legacy / history 类目录。
-6. 不要默认全文读取大型 PRD、合同、worklog 或 memory 文件。
-7. 单次 discovery 输出尽量不超过 120 行；命中过多时先收窄关键词、模块名、文件名或合同 ID。
-8. 优先用 `rg -n -C 2 "<关键词>" <目标文件...>` 定位，再用 `sed -n '<start>,<end>p'` 读取小段。
+1. **结构定位**
+   - 优先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'`，用限量 JSON 确定模块、主 PRD 和合同文件。
+   - 如果脚本不可用，再检索 `docs/prd/README.md` 的命中行：`rg -n -m 20 '<模块|关键词|合同ID>' docs/prd/README.md`。
+   - 如果入口不清，先用 `rg --files docs/prd docs/plans docs/worklog | rg '<模块|关键词|合同ID>'` 或 `rg -l '<关键词>' <高概率目录...>` 找候选文件，不直接打印正文。
+2. **命中收窄**
+   - 只在候选 PRD / 合同 / 少量历史文件里搜索：`rg -n -m 8 -C 1 '<关键词>' <目标文件...>`。
+   - 如果命中超过 20 行或超过 3 个文件，先用模块名、文件名、接口名、字段名、错误码或合同 ID 再收窄。
+3. **小段读取**
+   - 用 `sed -n '<start>,<end>p' <file>` 读取命中相邻段落；单次读取通常不超过 80 行，discovery 总输出尽量不超过 120 行。
+   - 大型 PRD、合同、worklog、memory、日志、JSON 和浏览器状态都不全文读取；原始证据先落盘到 `/tmp/<project>-*`，对话里只输出关键统计、路径和少量摘录。
+4. **历史与 diff 输入**
+   - 只有命中不足、合同冲突、高风险回归或用户明确要求追溯历史时，才读取 plans / worklogs / memory。
+   - 代码变更输入先用 `git diff --name-only` 和 `git diff --stat`；需要语义判断时才对目标文件运行 scoped diff。
+5. **禁止的默认形态**
+   - 不默认运行 `rg '<关键词>' .`、`rg --hidden '<关键词>' .`，或把源码目录、测试目录、历史文档目录和全量 docs 一起宽扫。
+   - 不默认搜索 archive / legacy / history 类目录。
+   - 不用 `cat`、大范围 `tail` 或未过滤日志把大型文件正文灌进上下文。
 
 ## 任务路由
 
@@ -36,10 +45,12 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 - **提炼 PRD**：运行 `scripts/prd_distill.py scan --root <repo>`；按模块收窄读取；更新模块 PRD 和 `docs/prd/README.md`；运行 `scripts/prd_distill.py check --root <repo>`。需要文档边界时读 `references/doc-model.md`。
 - **整理约束合同**：读取 `references/contract-rules.md`，再处理合同草稿、生效条件、测试绑定和运行证据。
-- **检查一致性**：运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。
+- **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。
 - **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`。
 - **开发前模块入场 / 合同保护**：当用户要求开发已有模块、修 bug、调整模块行为，或提到陌生模块概念时，读取 `references/module-entry-contract-protection.md`。
 - **安装、平台差异或 hooks**：只在用户询问或需要安装/排查时读取 `references/platforms.md` 或 `references/claude-code-hooks.md`。
+
+一次只读取当前路由必需的 reference；不要为了预热同时读取全部 references。若任务跨路由，先完成主路由，再按缺口加载下一个 reference。
 
 参考路由：
 
@@ -53,6 +64,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 1. **发现结构**
    - 检查 `docs/prd/` 是否存在，用文件列表或索引命中了解结构；不要为了发现结构全文读取。
+   - 有关键词时优先用 `scripts/prd_distill.py lookup --root <repo> --query '<关键词>'` 做限量定位。
    - 如果 PRD 结构缺失，运行 `scripts/prd_distill.py init --root <repo>`。
    - 如果 PRD 结构已存在但项目入口文件缺少 PRD Distill 受控块，运行 `scripts/prd_distill.py install-bridge --root <repo>`。
 
