@@ -66,7 +66,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 - **提炼 PRD**：运行 `scripts/prd_distill.py scan --root <repo>`；按模块收窄读取；更新模块 PRD 和 `docs/prd/README.md`；运行 `scripts/prd_distill.py check --root <repo>`。需要文档边界时读 `references/doc-model.md`。
 - **整理约束合同**：读取 `references/contract-rules.md`，再处理合同草稿、生效条件、测试绑定和运行证据。
-- **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。
+- **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 只验证文档结构、待处理草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断，不能用脚本通过替代。
 - **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`；提交前默认检查证据与文档收口，不把它理解成重新跑一遍合同测试。
 - **开发前模块入场 / 合同保护**：当用户要求开发已有模块、修 bug、调整模块行为，或提到陌生模块概念时，读取 `references/module-entry-contract-protection.md`。有合同命中才输出清单；无命中用一行说明。
 - **安装、平台差异或 hooks**：只在用户询问或需要安装/排查时读取 `references/platforms.md` 或 `references/claude-code-hooks.md`。
@@ -110,6 +110,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 6. **验证**
    - 运行 `scripts/prd_distill.py check --root <repo>`。
+   - 检查一致性或提交前收尾时，只对受本轮改动影响的事实面标记 `无需修改 / 已更新并验证 / 待处理 / 范围外 / 不适用`；没有生效合同命中时仍要报告适用的 PRD、运行证据和入口桥接状态，但不强凑无关事实面。
    - 有受影响合同时只输出最小验收矩阵；无命中合同则不输出矩阵。`未验证` 不是完成态；UI / UX 无页面证据则标为未验证或部分通过。
 
 ```text
@@ -127,3 +128,4 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 - 不要把合同放在 `docs/prd` 平级；必须放在 `docs/prd/contracts/` 下。
 - 优先使用模块级合同文档，例如 `docs/prd/contracts/<module>.md`，不要按类型创建全局合同文件。
 - 项目特定的高风险路径、合同 ID、平台名、接口名和业务字段，不写入本通用 skill；应写入目标项目的入口规则、模块 PRD 或模块合同。
+- 只维护 PRD、合同、索引及 PRD Distill 受控入口桥接块；不要把一致性检查扩展为项目通用 README、Agent 记忆、规则文件或工作区清场。发现范围外残留只报告，不删除。
