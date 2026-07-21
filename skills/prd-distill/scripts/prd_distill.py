@@ -320,12 +320,21 @@ def cmd_pending(args: argparse.Namespace) -> int:
 
 def cmd_check(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
+    prd = root / "docs" / "prd"
     errors: list[str] = []
     warnings: list[str] = []
 
-    if not (root / "docs" / "prd" / "README.md").exists():
+    if not prd.exists():
+        print(json.dumps({
+            "status": "not_initialized",
+            "errors": errors,
+            "warnings": warnings,
+        }, ensure_ascii=False, indent=2))
+        return 0
+
+    if not (prd / "README.md").exists():
         warnings.append("缺少 docs/prd/README.md 模块索引")
-    if not (root / "docs" / "prd" / "contracts" / "README.md").exists():
+    if not (prd / "contracts" / "README.md").exists():
         warnings.append("缺少 docs/prd/contracts/README.md 合同索引")
 
     pending = _pending_files(root)
@@ -342,7 +351,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         if "运行证据" not in text:
             errors.append(f"{path}: 生效合同必须说明运行证据")
 
-    result = {"errors": errors, "warnings": warnings}
+    result = {"status": "initialized", "errors": errors, "warnings": warnings}
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 1 if errors else 0
 

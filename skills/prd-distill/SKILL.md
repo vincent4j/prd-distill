@@ -66,7 +66,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 - **提炼 PRD**：运行 `scripts/prd_distill.py scan --root <repo>`；按模块收窄读取；更新模块 PRD 和 `docs/prd/README.md`；运行 `scripts/prd_distill.py check --root <repo>`。需要文档边界时读 `references/doc-model.md`。
 - **整理约束合同**：读取 `references/contract-rules.md`，再处理合同草稿、生效条件、测试绑定和运行证据。
-- **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 只验证文档结构、待处理草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断，不能用脚本通过替代。
+- **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 返回 `not_initialized` 表示项目尚未启用 PRD Distill，不是结构 warning 或完成证明；返回 `initialized` 时再判断 errors / warnings。脚本只验证结构、草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断。
 - **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`；提交前默认检查证据与文档收口，不把它理解成重新跑一遍合同测试。
 - **开发前模块入场 / 合同保护**：当用户要求开发已有模块、修 bug、调整模块行为，或提到陌生模块概念时，读取 `references/module-entry-contract-protection.md`。有合同命中才输出清单；无命中用一行说明。
 - **安装、平台差异或 hooks**：只在用户询问或需要安装/排查时读取 `references/platforms.md` 或 `references/claude-code-hooks.md`。
@@ -86,7 +86,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 1. **发现结构**
    - 检查 `docs/prd/` 是否存在，用文件列表或索引命中了解结构；不要为了发现结构全文读取。
    - 有关键词时优先用 `scripts/prd_distill.py lookup --root <repo> --query '<关键词>'` 做限量定位。
-   - 如果 PRD 结构缺失，运行 `scripts/prd_distill.py init --root <repo>`。
+   - 如果用户要在当前项目启用 PRD Distill，而 PRD 结构缺失，运行 `scripts/prd_distill.py init --root <repo>`；其他任务遇到 `not_initialized` 时标记为不适用并继续，不强行初始化。
    - 如果 PRD 结构已存在但项目入口文件缺少 PRD Distill 受控块，运行 `scripts/prd_distill.py install-bridge --root <repo>`。
 
 2. **识别模块**
@@ -110,6 +110,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 6. **验证**
    - 运行 `scripts/prd_distill.py check --root <repo>`。
+   - `status: not_initialized` 只表示项目尚未采用 `docs/prd/`；需要启用时先 `init`，否则把 PRD / 合同结构标为不适用，不报告缺索引 warning。
    - 检查一致性或提交前收尾时，只对受本轮改动影响的事实面标记 `无需修改 / 已更新并验证 / 待处理 / 范围外 / 不适用`；没有生效合同命中时仍要报告适用的 PRD、运行证据和入口桥接状态，但不强凑无关事实面。
    - 有受影响合同时只输出最小验收矩阵；无命中合同则不输出矩阵。`未验证` 不是完成态；UI / UX 无页面证据则标为未验证或部分通过。
 

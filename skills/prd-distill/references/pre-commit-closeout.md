@@ -28,16 +28,19 @@
 ## 步骤
 
 1. 先用 `git diff --name-only` 和 `git diff --stat` 确认本轮变更范围，提取受影响模块、字段、接口和行为词。
-2. 运行 `scripts/prd_distill.py scan --root <repo>`，检查待处理的 PRD / 合同 inbox 草稿。
-3. `scan` 只用于发现候选输入。scan 后必须按模块名、文件名、合同 ID 或当前变更路径收窄读取范围；不能因为 scan 发现 plans / worklogs / memory 存在，就全文读取这些文件。
-4. 按受影响事实面判断哪些现役说法可能过期；如果存在需求碎片、强约束，或会影响 PRD 的实现变更，运行对应动作：
+2. 运行 `scripts/prd_distill.py check --root <repo>` 判断 PRD 结构状态：
+   - `status: not_initialized`：如果用户明确要启用 PRD Distill，先运行 `init`；否则把 PRD、合同和入口桥接标为 `不适用`，不报告缺索引 warning，也不强行创建结构。
+   - `status: initialized`：继续处理 errors / warnings；索引缺失代表已有结构不完整，不能按不适用跳过。
+3. 只在状态为 `initialized` 时运行 `scripts/prd_distill.py scan --root <repo>`，检查待处理的 PRD / 合同 inbox 草稿。
+4. `scan` 只用于发现候选输入。scan 后必须按模块名、文件名、合同 ID 或当前变更路径收窄读取范围；不能因为 scan 发现 plans / worklogs / memory 存在，就全文读取这些文件。
+5. 按受影响事实面判断哪些现役说法可能过期；如果存在需求碎片、强约束，或会影响 PRD 的实现变更，运行对应动作：
    - 用提炼 PRD 处理模块行为、工作流、字段、验收标准和决策变化。
    - 用整理约束合同处理已经在自测中有测试或运行证据支撑、且需要长期保留的硬约束。
    - 在最后一次提交前使用检查实现与文档是否一致。
-5. 检查本轮自测证据是否覆盖受影响合同；如果证据缺失或自测后又改了相关代码，只补跑受影响合同对应的测试，不做全量合同重测。
-6. 如果 PRD 结构或入口桥接受本轮影响，只检查并更新 PRD Distill 受控块，不重写项目通用规则。
-7. 将生成或更新的 PRD / 合同文件和代码变更一起 stage。
-8. 只提交一次，让代码和 PRD / 合同收尾进入同一个 commit。
+6. 检查本轮自测证据是否覆盖受影响合同；如果证据缺失或自测后又改了相关代码，只补跑受影响合同对应的测试，不做全量合同重测。
+7. 如果 PRD 结构或入口桥接受本轮影响，只检查并更新 PRD Distill 受控块，不重写项目通用规则。
+8. 将生成或更新的 PRD / 合同文件和代码变更一起 stage。
+9. 只提交一次，让代码和 PRD / 合同收尾进入同一个 commit。
 
 ## context-keeper 输入
 
