@@ -2,11 +2,9 @@
 
 ## 目录约定
 
-```text
-docs/plans/                  # 每日/会话需求碎片，通常来自 context-keeper
-docs/worklog/                # 每日/会话执行记录
-docs/memory-keeper.md        # 跨会话历史经验、触发词和合同候选（可选）
+PRD Distill 维护的目录：
 
+```text
 docs/prd/
   README.md                  # 模块索引
   <module-prd>.md            # 当前有效的产品 PRD 或技术 PRD
@@ -17,6 +15,24 @@ docs/prd/
   inbox/                     # PRD 需求碎片草稿
 ```
 
+可选的 context-keeper 目录（独立于 PRD Distill）：
+
+```text
+context-keeper/              # 新版 context-keeper 记录目录
+  memory-keeper.md
+  plans/
+  worklogs/
+  evolution/
+```
+
+历史遗留路径（不再兼容读取，仅作识别用）：
+
+```text
+docs/plans/                  # 旧版每日/会话需求碎片
+docs/worklog/                # 旧版每日/会话执行记录
+docs/memory-keeper.md        # 旧版跨会话历史经验
+```
+
 项目根目录还可以包含入口桥接规则：
 
 ```text
@@ -24,7 +40,7 @@ AGENTS.md                    # Codex / OpenAI agents 常驻项目规则
 CLAUDE.md                    # Claude Code 常驻项目规则
 ```
 
-`AGENTS.md` 和 `CLAUDE.md` 不是 PRD 正文，也不是合同来源。它们只保存 PRD Distill 的受控桥接块，让新会话知道开发前要去 `docs/prd/` 查模块 PRD 和合同，并在存在 `docs/memory-keeper.md` 时把它作为历史经验和合同候选的辅助检索源。
+`AGENTS.md` 和 `CLAUDE.md` 不是 PRD 正文，也不是合同来源。它们只保存 PRD Distill 的受控桥接块，让新会话知道开发前要去 `docs/prd/` 查模块 PRD 和合同。
 
 写入策略：
 
@@ -32,6 +48,7 @@ CLAUDE.md                    # Claude Code 常驻项目规则
 - 只存在一个：只写入已有文件。
 - 两个都不存在：默认创建两个。
 - 正式模块 PRD、合同正文、合同索引仍然只放在 `docs/prd/` 下。
+- PRD Distill 不写入 `context-keeper/` 任何子目录；context-keeper 文件由 context-keeper 自身维护。
 
 ## plans 和 PRD 的边界
 
@@ -39,22 +56,20 @@ CLAUDE.md                    # Claude Code 常驻项目规则
 
 `PRD` 是按模块组织的。这里只保留当前有效行为、稳定工作流、字段定义、决策规则、异常处理、非目标和验收标准。
 
-转换关系：
-
-```text
-聊天碎片 -> 每日 plans -> 模块 PRD
-```
+一次性需求、被拒绝方案、待确认事项和会话实施步骤可以永久停留在历史层，不要求进入模块 PRD。当前仍有效且确实需要产品规范化的部分才进入 PRD。
 
 ## memory-keeper 和 PRD 的边界
 
-`docs/memory-keeper.md` 是可选的历史经验索引，通常由 context-keeper 维护。PRD Distill 不要求安装 context-keeper；没有该文件时直接跳过 memory 检索。该文件可以包含模块、触发词、任务、关键经验和合同候选，用于帮助后续 agent 快速想起类似问题。
+`context-keeper/memory-keeper.md`（旧版 `docs/memory-keeper.md`）是可选的历史经验索引，由 context-keeper 维护。PRD Distill 不要求安装 context-keeper；没有该文件时直接跳过 memory 检索。该文件可以包含模块、触发词、任务、关键经验和合同候选，用于帮助后续 agent 快速想起类似问题。
 
 `memory-keeper.md` 不是生效约束来源。命中的条目只能作为排查线索和合同候选；需要长期保护的规则必须经过 PRD Distill 提炼，进入 `docs/prd/contracts/inbox/` 或生效模块合同。
+
+PRD Distill 默认不读取 `context-keeper/` 或旧版 `docs/memory-keeper.md`；如需消费，按需从 `context-keeper/` 定位具体文件后交给 PRD Distill 处理。
 
 转换关系：
 
 ```text
-worklog / memory-keeper 合同候选 -> contracts/inbox 草稿 -> 生效模块合同
+context-keeper/evolution 经验(已验证) -> contracts/inbox 草稿 -> 生效模块合同
 ```
 
 ## 约束合同和 PRD 的关系

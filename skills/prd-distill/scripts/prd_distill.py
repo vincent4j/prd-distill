@@ -20,10 +20,10 @@ BRIDGE_CONTENT = f"""{BRIDGE_START}
 
 1. 用模块名、业务词、文件名、接口名、字段名、错误现象或合同 ID 检索 `docs/prd/README.md`，只读命中上下文。
 2. 继续在相关 PRD / 合同中关键词检索，只读命中条目；命中不清、跨模块或触碰核心流程 / 数据 / 安全边界时才扩大读取。
-3. `docs/memory-keeper.md` 只在 bug / 回归 / 相似问题 / 高风险模块或 PRD 命中不足时检索；硬约束以 `docs/prd/contracts/` 为准。
+3. 历史经验由 context-keeper 提供；按需消费已定位的有限证据，不依赖 context-keeper 也能运行。硬约束以 `docs/prd/contracts/` 为准。
 4. 编码前有命中则列最多 5 条 `受影响合同：<ID>：原因；证据：类型`；无命中只说 `未命中生效合同`。
 5. 实现后只验受影响合同；UI / UX / 视觉 / 交互 / 响应式需截图、DOM 或页面证据；无匹配证据不能宣称完成。
-6. 最终只报告命中合同状态 `通过 / 部分通过 / 未验证 / 不适用`；提交前若改了 plans/worklog/memory/PRD/合同，先做 PRD Distill 收尾。
+6. 最终只报告命中合同状态 `通过 / 部分通过 / 未验证 / 不适用`；提交前若改了 PRD / 合同，先做 PRD Distill 收尾。
 {BRIDGE_END}
 """
 
@@ -146,24 +146,72 @@ def cmd_install_bridge(args: argparse.Namespace) -> int:
     return 0
 
 
-def _list_md(path: Path) -> list[str]:
+def _list_md(path: Path, base: Path | None = None) -> list[str]:
     if not path.exists():
         return []
-    return sorted(str(item) for item in path.glob("*.md"))
+    if base is None:
+        return sorted(str(item) for item in path.glob("*.md"))
+    return sorted(str(item.relative_to(base)) for item in path.glob("*.md"))
+
+
+def _detect_context_keeper_layout(root: Path) -> str:
+    """判断 context-keeper 目录的布局:
+    - "new"     只包含新路径(context-keeper/{plans, worklogs, memory-keeper.md, evolution})
+    - "legacy"  只包含旧路径(docs/{plans, worklog, memory-keeper.md})
+    - "missing" 没有任何 context-keeper 内容
+    """
+    new_layout = (
+        (root / "memory-keeper.md").exists()
+        or (root / "plans").exists()
+        or (root / "worklogs").exists()
+        or (root / "evolution").exists()
+    )
+    legacy_layout = (
+        (root.parent / "docs" / "memory-keeper.md").exists()
+        or (root.parent / "docs" / "plans").exists()
+        or (root.parent / "docs" / "worklog").exists()
+    )
+    if new_layout and not legacy_layout:
+        return "new"
+    if legacy_layout and not new_layout:
+        return "legacy"
+    if new_layout and legacy_layout:
+        return "mixed"
+    return "missing"
+
+
+def _list_context_keeper_files(root: Path, base: Path) -> dict[str, object]:
+    return {
+        "memory_keeper": str((root / "memory-keeper.md").relative_to(base))
+        if (root / "memory-keeper.md").exists()
+        else None,
+        "plans": _list_md(root / "plans", base),
+        "worklogs": _list_md(root / "worklogs", base),
+        "evolution": _list_md(root / "evolution", base),
+    }
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
+    context_keeper = root / "context-keeper"
+    legacy = root / "docs"
     data = {
-        "plans": _list_md(root / "docs" / "plans"),
-        "worklogs": _list_md(root / "docs" / "worklog"),
-        "memory_keeper": str(root / "docs" / "memory-keeper.md")
-        if (root / "docs" / "memory-keeper.md").exists()
-        else None,
-        "prd": _list_md(root / "docs" / "prd"),
-        "prd_inbox": _list_md(root / "docs" / "prd" / "inbox"),
-        "contracts": _list_md(root / "docs" / "prd" / "contracts"),
-        "contracts_inbox": _list_md(root / "docs" / "prd" / "contracts" / "inbox"),
+        "context_keeper": {
+            "installed": context_keeper.exists(),
+            "layout": _detect_context_keeper_layout(context_keeper) if context_keeper.exists() else "missing",
+            "files": _list_context_keeper_files(context_keeper, root) if context_keeper.exists() else {},
+        },
+        "legacy_history": {
+            "plans": _list_md(legacy / "plans", root),
+            "worklogs": _list_md(legacy / "worklog", root),
+            "memory_keeper": str(legacy / "memory-keeper.md")
+            if (legacy / "memory-keeper.md").exists()
+            else None,
+        },
+        "prd": _list_md(root / "docs" / "prd", root),
+        "prd_inbox": _list_md(root / "docs" / "prd" / "inbox", root),
+        "contracts": _list_md(root / "docs" / "prd" / "contracts", root),
+        "contracts_inbox": _list_md(root / "docs" / "prd" / "contracts" / "inbox", root),
     }
     print(json.dumps(data, ensure_ascii=False, indent=2))
     return 0
@@ -235,7 +283,11 @@ def _clip(text: str, limit: int = 240) -> str:
     return text[: limit - 1].rstrip() + "…"
 
 
-def _collect_lookup_candidates(root: Path, include_history: bool) -> list[Path]:
+def _collect_lookup_candidates(root: Path) -> list[Path]:
+    """默认且始终只搜索 docs/prd/ 与生效合同。
+    历史证据不在候选列表中, 必须由调用方通过其他方式(如 context-keeper)
+    显式定位具体文件, 再交给 PRD Distill 处理。
+    """
     candidates: list[Path] = []
     prd = root / "docs" / "prd"
     contracts = prd / "contracts"
@@ -248,14 +300,6 @@ def _collect_lookup_candidates(root: Path, include_history: bool) -> list[Path]:
     ):
         if path.exists():
             candidates.append(path)
-
-    if include_history:
-        memory = root / "docs" / "memory-keeper.md"
-        if memory.exists():
-            candidates.append(memory)
-        for directory in (root / "docs" / "plans", root / "docs" / "worklog"):
-            if directory.exists():
-                candidates.extend(sorted(directory.glob("*.md"), reverse=True))
     return candidates
 
 
@@ -275,7 +319,7 @@ def cmd_lookup(args: argparse.Namespace) -> int:
     searched: list[str] = []
     records: list[dict[str, object]] = []
 
-    for path in _collect_lookup_candidates(root, args.include_history):
+    for path in _collect_lookup_candidates(root):
         try:
             rel = str(path.relative_to(root))
         except ValueError:
@@ -303,7 +347,6 @@ def cmd_lookup(args: argparse.Namespace) -> int:
         "searched_files": len(searched),
         "max_files": args.max_files,
         "max_matches_per_file": args.max_matches_per_file,
-        "include_history": args.include_history,
         "truncated": len(records) > args.max_files,
         "matches": matches,
     }, ensure_ascii=False, indent=2))
@@ -377,7 +420,6 @@ def build_parser() -> argparse.ArgumentParser:
     lookup.add_argument("--query", required=True)
     lookup.add_argument("--max-files", type=int, default=3)
     lookup.add_argument("--max-matches-per-file", type=int, default=8)
-    lookup.add_argument("--include-history", action="store_true")
     lookup.set_defaults(func=cmd_lookup)
 
     new_contract = sub.add_parser("new-contract", help="创建合同草稿")

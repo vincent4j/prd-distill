@@ -19,7 +19,7 @@
 - 模块 PRD：当前有效行为、边界和验收标准是否需要更新。
 - 约束合同：生效合同是否受影响，成熟的新约束是否需要进入草稿或生效合同。
 - 入口桥接：仅检查 PRD Distill 受控块是否仍指向正确的 PRD / 合同入口。
-- 历史输入：仅在本轮已经使用 plans / worklogs / memory 时判断是否需要提炼，不把它们当生效真相源。
+- 历史输入：仅在本轮明确改变当前产品行为、验收标准或长期约束时，才把已定位的 `context-keeper/` 证据交给 PRD Distill。单纯保存进度、补工作日志、记录失败或新增待验证经验不触发 PRD 更新。
 
 每个适用事实面标记为 `无需修改 / 已更新并验证 / 待处理 / 范围外 / 不适用`。小改动不必强凑全部事实面；无法验证的结论必须标为 `待处理`，不能写成完成。
 
@@ -32,7 +32,7 @@
    - `status: not_initialized`：如果用户明确要启用 PRD Distill，先运行 `init`；否则把 PRD、合同和入口桥接标为 `不适用`，不报告缺索引 warning，也不强行创建结构。
    - `status: initialized`：继续处理 errors / warnings；索引缺失代表已有结构不完整，不能按不适用跳过。
 3. 只在状态为 `initialized` 时运行 `scripts/prd_distill.py scan --root <repo>`，检查待处理的 PRD / 合同 inbox 草稿。
-4. `scan` 只用于发现候选输入。scan 后必须按模块名、文件名、合同 ID 或当前变更路径收窄读取范围；不能因为 scan 发现 plans / worklogs / memory 存在，就全文读取这些文件。
+4. `scan` 只用于发现候选输入。scan 后必须按模块名、文件名、合同 ID 或当前变更路径收窄读取范围；不要因为 scan 看到 `context-keeper/` 或旧版历史目录存在，就全文读取这些文件。
 5. 按受影响事实面判断哪些现役说法可能过期；如果存在需求碎片、强约束，或会影响 PRD 的实现变更，运行对应动作：
    - 用提炼 PRD 处理模块行为、工作流、字段、验收标准和决策变化。
    - 用整理约束合同处理已经在自测中有测试或运行证据支撑、且需要长期保留的硬约束。
@@ -44,12 +44,13 @@
 
 ## context-keeper 输入
 
-如果本轮会话刚运行过 `context-keeper`，或当前变更里出现新的 `docs/plans/`、`docs/worklog/`、`docs/memory-keeper.md`，并且用户要求提交、保存并提交或推送，必须把这些文件视为 PRD Distill 输入：
+context-keeper 与 PRD Distill 互相独立。`context-keeper/` 下保存了进度、工作日志和进化经验，PRD Distill 不主动宽扫这些目录。提交前只在以下条件同时成立时，才把 `context-keeper/` 中已定位的具体文件作为有限证据输入：
 
-- 先用本轮模块名、触发词、文件名和合同候选检索。
-- 只读取相关命中内容。
-- 判断是否需要进入 PRD / 合同草稿或生效合同。
-- 不要让 plans / worklog / memory 单独提交而未检查是否需要提炼到 `docs/prd/`。
+- 本轮改动改变了当前产品行为、验收标准或长期约束。
+- 已经知道要从 `context-keeper/plans/`、`context-keeper/worklogs/`、`context-keeper/memory-keeper.md` 或 `context-keeper/evolution/` 中读取哪一份或哪几份具体文件。
+- 已经用模块名、合同 ID、字段名或文件名收窄到具体命中片段，不做全文加载。
+
+仅当本轮刚保存过 `context-keeper/` 记录、用户没有新增产品约束、也没有新合同候选时，跳过历史输入这一步。Context Keeper 文件可以与代码一起提交，但不能因为它们存在就强制产生 PRD 或合同改动。
 
 ## 收尾汇报
 

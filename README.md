@@ -23,7 +23,7 @@ PRD Distill 想解决的就是这些问题：不要让重要规则只活在聊�
 - **写入项目入口规则**：让后续 agent 知道开发前应该先查 PRD / 合同。
 - **提交前收尾**：提醒 agent 把代码、PRD、合同和验证证据一起对齐。
 
-`context-keeper` 更像“当天工作记录”，PRD Distill 更像“长期规则整理”。两者可以配合，但 PRD Distill 不是 `context-keeper` 的插件；新项目里只有一段对话、当前代码改动，或者已有产品文档，也可以直接开始用。
+`context-keeper` 更像”当天工作记录”，PRD Distill 更像”长期规则整理”。两者互相独立：没有 `context-keeper` 时 PRD Distill 仍能根据当前对话、当前代码和已有产品文档工作；没有 PRD Distill 时 `context-keeper` 仍能保存进度。两者同时存在时，PRD Distill 只在显式提供 `context-keeper/` 下的具体文件时消费其内容，不主动宽扫历史目录。
 
 ## 怎么开始用
 

@@ -5,16 +5,16 @@ description: "把需求碎片、代码变更、历史经验提炼成模块 PRD �
 
 # PRD Distill
 
-把分散的用户需求、计划、工作记录、实现 diff 和历史经验，提炼成可维护的模块 PRD、`docs/prd/README.md` 索引和 `docs/prd/contracts/<module>.md` 约束合同。保持 `context-keeper` 独立；有 plans / worklogs / memory 时只按需作为输入。
+把当前用户需求、当前代码变更、当前产品文档和运行证据，提炼成可维护的模块 PRD、`docs/prd/README.md` 索引和 `docs/prd/contracts/<module>.md` 约束合同。保持 `context-keeper` 独立运行；只在显式提供有限证据时消费 `context-keeper/` 内容。
 
 ## 上下文预算与读取纪律
 
 把 `rg` 当索引器，不当正文读取器。默认按三阶段读取：先定位文件，再收窄命中，最后小段读取。
 
 1. **结构定位**
-   - 优先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'`，用限量 JSON 确定模块、主 PRD 和合同文件。
+   - 优先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'`，用限量 JSON 确定模块、主 PRD 和合同文件。`lookup` 默认只搜索 `docs/prd/` 与生效合同；不传 `--evidence` 时不读取 `context-keeper/` 或旧版 `docs/plans/`、`docs/worklog/`、`docs/memory-keeper.md`。
    - 如果脚本不可用，再检索 `docs/prd/README.md` 的命中行：`rg -n -m 20 '<模块|关键词|合同ID>' docs/prd/README.md`。
-   - 如果入口不清，先用 `rg --files docs/prd docs/plans docs/worklog | rg '<模块|关键词|合同ID>'` 或 `rg -l '<关键词>' <高概率目录...>` 找候选文件，不直接打印正文。
+   - 如果入口不清，先用 `rg --files docs/prd | rg '<模块|关键词|合同ID>'` 或 `rg -l '<关键词>' <高概率目录...>` 找候选文件，不直接打印正文。
 2. **命中收窄**
    - 只在候选 PRD / 合同 / 少量历史文件里搜索：`rg -n -m 8 -C 1 '<关键词>' <目标文件...>`。
    - 如果命中超过 20 行或超过 3 个文件，先用模块名、文件名、接口名、字段名、错误码或合同 ID 再收窄。
@@ -22,7 +22,7 @@ description: "把需求碎片、代码变更、历史经验提炼成模块 PRD �
    - 用 `sed -n '<start>,<end>p' <file>` 读取命中相邻段落；单次读取通常不超过 80 行，discovery 总输出尽量不超过 120 行。
    - 大型 PRD、合同、worklog、memory、日志、JSON 和浏览器状态都不全文读取；原始证据先落盘到 `/tmp/<project>-*`，对话里只输出关键统计、路径和少量摘录。
 4. **历史与 diff 输入**
-   - 只有命中不足、合同冲突、高风险回归或用户明确要求追溯历史时，才读取 plans / worklogs / memory。
+   - 只有命中不足、合同冲突、高风险回归或用户明确要求追溯历史时，才通过 `context-keeper` 显式取得证据；不在 PRD Distill 内宽扫 `context-keeper/` 或旧版历史目录。
    - 代码变更输入先用 `git diff --name-only` 和 `git diff --stat`；需要语义判断时才对目标文件运行 scoped diff。
 5. **禁止的默认形态**
    - 不默认运行 `rg '<关键词>' .`、`rg --hidden '<关键词>' .`，或把源码目录、测试目录、历史文档目录和全量 docs 一起宽扫。
@@ -66,7 +66,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 - **提炼 PRD**：运行 `scripts/prd_distill.py scan --root <repo>`；按模块收窄读取；更新模块 PRD 和 `docs/prd/README.md`；运行 `scripts/prd_distill.py check --root <repo>`。需要文档边界时读 `references/doc-model.md`。
 - **整理约束合同**：读取 `references/contract-rules.md`，再处理合同草稿、生效条件、测试绑定和运行证据。
-- **检查一致性**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 返回 `not_initialized` 表示项目尚未启用 PRD Distill，不是结构 warning 或完成证明；返回 `initialized` 时再判断 errors / warnings。脚本只验证结构、草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断。
+- **检查实现与文档是否一致**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 返回 `not_initialized` 表示项目尚未启用 PRD Distill，不是结构 warning 或完成证明；返回 `initialized` 时再判断 errors / warnings。脚本只验证结构、草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断。`lookup` 默认不读取 `context-keeper/` 或旧版历史目录；如需消费历史证据，按需从 `context-keeper/` 中定位有限文件再交给 PRD Distill 处理。
 - **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`；提交前默认检查证据与文档收口，不把它理解成重新跑一遍合同测试。
 - **开发前模块入场 / 合同保护**：当用户要求开发已有模块、修 bug、调整模块行为，或提到陌生模块概念时，读取 `references/module-entry-contract-protection.md`。有合同命中才输出清单；无命中用一行说明。
 - **安装、平台差异或 hooks**：只在用户询问或需要安装/排查时读取 `references/platforms.md` 或 `references/claude-code-hooks.md`。
@@ -95,8 +95,8 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
    - 多个模块同样可能时先问用户确认。
 
 3. **收集输入**
-   - 按优先级收集：用户当前明确需求、当前 `git diff --name-only` / `git diff --stat`、PRD 索引命中、目标 PRD / 合同命中段落、plans / worklogs / memory 的窄命中段落。
-   - 不要从历史文件开始收集输入，除非用户要求追溯历史、当前问题是回归，或 PRD / 合同命中不足。
+   - 按优先级收集：用户当前明确需求、当前 `git diff --name-only` / `git diff --stat`、PRD 索引命中、目标 PRD / 合同命中段落。
+   - 历史证据只在命中不足、合同冲突、高风险回归或用户明确要求时，通过 `context-keeper` 取得有限片段；不要让每条消息都从历史文件开始。
 
 4. **提炼**
    - 临时调试细节放到 worklog，不放进 PRD。

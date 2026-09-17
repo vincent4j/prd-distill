@@ -1,4 +1,4 @@
 interface:
   display_name: "PRD Distill"
   short_description: "提炼模块 PRD 与合同，检查一致性并做提交前收尾"
-  default_prompt: "使用 $prd-distill 将需求、代码变更或历史经验提炼成模块 PRD 与合同，并在提交前检查一致性。"
+  default_prompt: "使用 $prd-distill 将当前需求、代码变更和运行证据提炼成模块 PRD 与合同，并在提交前检查一致性。"

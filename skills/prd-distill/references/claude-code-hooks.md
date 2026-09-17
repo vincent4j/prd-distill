@@ -54,7 +54,7 @@ skills/prd-distill/scripts/claude_hooks/
 `harvest_prd_prompt.py`：
 
 - 从 stdin JSON 读取用户 prompt。
-- 识别 `必须`、`不能`、`每个`、`之前解决过`、`为什么会没有` 等强需求触发词。
+- 识别 `必须`、`不能`、`每个`、`为什么会没有` 等强需求触发词；不把"之前解决过""又复现"等纯历史信号当作强需求。
 - 追加写入 `docs/prd/inbox/YYYY-MM-DD-requirement-fragments.md`。
 - 不直接创建生效 PRD 或合同文件。
 
