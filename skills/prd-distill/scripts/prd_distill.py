@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -62,11 +63,27 @@ def _write_if_missing(path: Path, content: str) -> bool:
     return True
 
 
-def _select_bridge_targets(root: Path) -> list[Path]:
+def _select_bridge_targets(root: Path, mode: str = "existing") -> list[Path]:
+    """选择要写入受控块的入口桥接文件。
+
+    mode 取值:
+    - "claude"   只写 CLAUDE.md (默认, 多数用户用 Claude Code)
+    - "agents"   只写 AGENTS.md (Codex / OpenAI agents)
+    - "both"     两个都写
+    - "existing" 项目根里有哪个就写哪个, 都没有时同时创建两个
+    """
     agents = root / "AGENTS.md"
     claude = root / "CLAUDE.md"
-    existing = [path for path in (agents, claude) if path.exists()]
-    return existing or [agents, claude]
+    if mode == "claude":
+        return [claude]
+    if mode == "agents":
+        return [agents]
+    if mode == "both":
+        return [agents, claude]
+    if mode == "existing":
+        existing = [path for path in (agents, claude) if path.exists()]
+        return existing or [agents, claude]
+    raise ValueError(f"未知的 --bridge-target: {mode}")
 
 
 def _upsert_bridge(path: Path) -> str:
@@ -98,38 +115,97 @@ def _upsert_bridge(path: Path) -> str:
 
 
 def cmd_init(args: argparse.Namespace) -> int:
+    """完整启用 PRD Distill 于本项目:
+    1. 创建 docs/prd/ 结构 (PRD / 合同目录)
+    2. 写入入口桥接块 (CLAUDE.md / AGENTS.md)
+    3. 写项目级 .claude/settings.json 的 hook 配置
+
+    三步一起做才能让本项目真正"启用": 没 init 的项目压根不会创建
+    docs/prd/ 目录, 也没项目级 hook 配置, hook 不被 Claude Code 调用。
+    """
     root = Path(args.root).resolve()
     prd = root / "docs" / "prd"
     contracts = prd / "contracts"
     created: list[str] = []
-
-    for directory in (prd / "inbox", contracts / "inbox"):
-        directory.mkdir(parents=True, exist_ok=True)
-        created.append(str(directory.relative_to(root)))
 
     if _write_if_missing(prd / "README.md", _read_template("prd-index.md")):
         created.append("docs/prd/README.md")
     if _write_if_missing(contracts / "README.md", _read_template("contracts-readme.md")):
         created.append("docs/prd/contracts/README.md")
 
+    bridge_targets = _select_bridge_targets(root, args.bridge_target)
     bridge_results = []
-    for path in _select_bridge_targets(root):
+    for path in bridge_targets:
         action = _upsert_bridge(path)
         bridge_results.append({
             "file": str(path.relative_to(root)),
             "action": action,
         })
 
+    # init 自动写项目级 hook 配置: 装好脚本路径引用, 让 Claude Code 在
+    # 本项目里调用 harvest / guard hook。未 init 的项目无 settings.json,
+    # hook 不被调用, docs/prd/ 也不会被创建。
+    hook_result = _write_project_hooks(root)
+
     print(json.dumps({
         "created_or_existing": created,
         "bridge": bridge_results,
+        "hook": hook_result,
+        "enabled": True,
     }, ensure_ascii=False, indent=2))
     return 0
 
 
+def _write_project_hooks(root: Path) -> dict[str, object]:
+    """把 hook 配置写到 <root>/.claude/settings.json (项目级), 返回结果摘要。
+
+    抽出来给 cmd_init 和 cmd_install_hooks 共用。
+    """
+    home = Path.home()
+    hooks_dir = home / ".claude" / "hooks" / "prd-distill"
+    harvest_script = hooks_dir / "harvest_prd_prompt.py"
+    guard_script = hooks_dir / "guard_prd_commit.py"
+
+    claude_dir = root / ".claude"
+    settings_path = claude_dir / "settings.json"
+
+    if settings_path.exists():
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    else:
+        settings = {}
+
+    hooks = settings.setdefault("hooks", {})
+    user_prompt = hooks.setdefault("UserPromptSubmit", [])
+    pre_tool = hooks.setdefault("PreToolUse", [])
+
+    _remove_hook_entry(user_prompt, "harvest_prd_prompt.py")
+    _remove_hook_entry(pre_tool, "guard_prd_commit.py")
+
+    user_prompt.append({
+        "hooks": [{"type": "command", "command": f"python3 {shlex.quote(str(harvest_script))}"}]
+    })
+    pre_tool.append({
+        "matcher": "Bash",
+        "hooks": [{
+            "type": "command",
+            "command": f"python3 {shlex.quote(str(guard_script))}",
+        }],
+    })
+
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    return {
+        "settings_file": str(settings_path.relative_to(root)),
+        "hook_scripts_dir": str(hooks_dir),
+        "scope": "project",
+        "rule": "未启用的项目没有 settings.json, hook 不被 Claude Code 调用, docs/prd/ 也不会被创建",
+    }
+
+
 def cmd_install_bridge(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
-    targets = _select_bridge_targets(root)
+    targets = _select_bridge_targets(root, args.bridge_target)
     results = []
     for path in targets:
         action = _upsert_bridge(path)
@@ -154,65 +230,37 @@ def _list_md(path: Path, base: Path | None = None) -> list[str]:
     return sorted(str(item.relative_to(base)) for item in path.glob("*.md"))
 
 
-def _detect_context_keeper_layout(root: Path) -> str:
-    """判断 context-keeper 与项目根 docs/ 的布局:
-    - "new"     context-keeper/ 下有新路径(memory-keeper.md / plans / worklogs /
-                evolution)至少一个, 且项目根 docs/ 下没有旧路径。
-    - "legacy"  context-keeper/ 下没有新路径, 但项目根 docs/ 下有旧路径
-                (memory-keeper.md / plans / worklog)。
-    - "mixed"   新旧路径同时存在。
-    - "missing" context-keeper/ 不存在, 项目根 docs/ 也没有旧路径。
+def _find_memory_keeper_files(root: Path) -> list[str]:
+    """全项目扫描 memory-keeper.md, 返回相对路径列表(已排序)。
 
-    参数 root 是 context-keeper/ 目录, 旧路径检查的是 root.parent / "docs"。
+    context-keeper 的存储目录是用户可配置的(--store-dir / 配置文件 /
+    _discovery_candidates 发现), 任何固定路径枚举都会漏掉自定义位置。
+    但 memory-keeper.md 作为 context-keeper 的统一入口文件名, 不管
+    目录在哪, 全项目 rglob 都能可靠发现。
     """
-    new_layout = (
-        (root / "memory-keeper.md").exists()
-        or (root / "plans").exists()
-        or (root / "worklogs").exists()
-        or (root / "evolution").exists()
+    return sorted(
+        str(p.relative_to(root))
+        for p in root.rglob("memory-keeper.md")
+        if p.is_file()
     )
-    legacy_root = root.parent / "docs"
-    legacy_layout = (
-        (legacy_root / "memory-keeper.md").exists()
-        or (legacy_root / "plans").exists()
-        or (legacy_root / "worklog").exists()
-    )
-    if new_layout and not legacy_layout:
-        return "new"
-    if legacy_layout and not new_layout:
-        return "legacy"
-    if new_layout and legacy_layout:
-        return "mixed"
-    return "missing"
-
-
-def _list_context_keeper_files(root: Path, base: Path) -> dict[str, object]:
-    return {
-        "memory_keeper": str((root / "memory-keeper.md").relative_to(base))
-        if (root / "memory-keeper.md").exists()
-        else None,
-        "plans": _list_md(root / "plans", base),
-        "worklogs": _list_md(root / "worklogs", base),
-        "evolution": _list_md(root / "evolution", base),
-    }
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
+    """列出 PRD / 合同目录、旧版历史目录(根 docs/ 下 plans / worklog)与
+    全项目找到的 memory-keeper.md。
+
+    memory-keeper.md 全项目扫描不假设 context-keeper 存储目录的位置;
+    plans / worklogs / evolution 等子目录内容由 --evidence 显式提供。
+    """
     root = Path(args.root).resolve()
-    context_keeper = root / "context-keeper"
     legacy = root / "docs"
     data = {
         "context_keeper": {
-            "installed": context_keeper.exists(),
-            "layout": _detect_context_keeper_layout(context_keeper) if context_keeper.exists() else "missing",
-            "files": _list_context_keeper_files(context_keeper, root) if context_keeper.exists() else {},
+            "memory_keeper_files": _find_memory_keeper_files(root),
         },
         "legacy_history": {
             "plans": _list_md(legacy / "plans", root),
             "worklogs": _list_md(legacy / "worklog", root),
-            "memory_keeper": str(legacy / "memory-keeper.md")
-            if (legacy / "memory-keeper.md").exists()
-            else None,
         },
         "prd": _list_md(root / "docs" / "prd", root),
         "prd_inbox": _list_md(root / "docs" / "prd" / "inbox", root),
@@ -437,17 +485,83 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 1 if errors else 0
 
 
+def cmd_install_hooks(args: argparse.Namespace) -> int:
+    """把 hook 配置写到 <project>/.claude/settings.json (项目级)。
+
+    hook 脚本本身来自 ~/.claude/hooks/prd-distill/ (由 install.py 装一次,
+    所有项目共用), 项目级 settings.json 只引用其路径。未启用的项目
+    没有这个文件, hook 不会被触发。
+    """
+    root = Path(args.root).resolve()
+    result = _write_project_hooks(root)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _remove_hook_entry(items: list[dict], script_name: str) -> None:
+    """从 settings.json 的 hook 列表里移除引用指定脚本的条目。"""
+    needle = script_name.replace("\\", "/")
+    kept_items: list[dict] = []
+    for group in items:
+        kept_group_hooks: list[dict] = []
+        for hook in group.get("hooks", []):
+            command = str(hook.get("command") or "").replace("\\", "/")
+            if needle not in command:
+                kept_group_hooks.append(hook)
+        if kept_group_hooks:
+            new_group = dict(group)
+            new_group["hooks"] = kept_group_hooks
+            kept_items.append(new_group)
+    items[:] = kept_items
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    """报告项目级 PRD Distill 启用状态。
+
+    PRD Distill 是项目级 skill: 默认对所有项目都不启用。Agent 在对话中
+    识别触发词且项目未启用时, 调用 status 确认状态, 然后询问用户
+    是否启用 (运行 init --root <repo>)。
+    """
+    root = Path(args.root).resolve()
+    enabled = (root / "docs" / "prd" / "README.md").exists()
+    print(json.dumps({
+        "root": str(root),
+        "prd_distill_enabled": enabled,
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="PRD Distill 辅助工具")
     sub = parser.add_subparsers(dest="command", required=True)
 
     init = sub.add_parser("init", help="初始化 docs/prd 结构")
     init.add_argument("--root", default=".")
+    init.add_argument(
+        "--bridge-target",
+        choices=("claude", "agents", "both", "existing"),
+        default="claude",
+        help="入口桥接文件选择: claude=只写 CLAUDE.md, agents=只写 AGENTS.md, "
+             "both=两个都写, existing=按现状逻辑 (默认 claude)",
+    )
     init.set_defaults(func=cmd_init)
 
     bridge = sub.add_parser("install-bridge", help="安装 AGENTS.md / CLAUDE.md 桥接规则")
     bridge.add_argument("--root", default=".")
+    bridge.add_argument(
+        "--bridge-target",
+        choices=("claude", "agents", "both", "existing"),
+        default="existing",
+        help="入口桥接文件选择, 同 init --bridge-target",
+    )
     bridge.set_defaults(func=cmd_install_bridge)
+
+    install_hooks = sub.add_parser(
+        "install-hooks",
+        help="把 hook 配置写到项目级 .claude/settings.json, 不动 ~/.claude/",
+    )
+    install_hooks.add_argument("--root", default=".")
+    install_hooks.set_defaults(func=cmd_install_hooks)
 
     scan = sub.add_parser("scan", help="扫描 PRD 相关文档")
     scan.add_argument("--root", default=".")
@@ -485,6 +599,13 @@ def build_parser() -> argparse.ArgumentParser:
     check = sub.add_parser("check", help="校验 PRD / 合同结构")
     check.add_argument("--root", default=".")
     check.set_defaults(func=cmd_check)
+
+    status = sub.add_parser(
+        "status",
+        help="报告项目级 PRD Distill 启用状态, 用于 Agent 判断是否需要询问用户启用",
+    )
+    status.add_argument("--root", default=".")
+    status.set_defaults(func=cmd_status)
     return parser
 
 

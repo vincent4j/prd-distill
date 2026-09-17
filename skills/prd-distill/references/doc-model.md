@@ -64,7 +64,9 @@ CLAUDE.md                    # Claude Code 常驻项目规则
 
 `memory-keeper.md` 不是生效约束来源。命中的条目只能作为排查线索和合同候选；需要长期保护的规则必须经过 PRD Distill 提炼，进入 `docs/prd/contracts/inbox/` 或生效模块合同。
 
-PRD Distill 默认不读取 `context-keeper/` 或旧版 `docs/memory-keeper.md`；如需消费，按需从 `context-keeper/` 定位具体文件后交给 PRD Distill 处理。
+PRD Distill 默认不读取 `context-keeper/` 或旧版 `docs/memory-keeper.md`；如需消费，按需从 `context-keeper/`（或用户自定义的存储目录）定位具体文件后交给 PRD Distill 处理。
+
+`scan` 通过全项目 rglob `memory-keeper.md` 提示 context-keeper 是否存在，但不假设存储目录位置——用户 init 时通过 `--store-dir` 或配置文件指定的任意路径都能被发现。`plans` / `worklogs` / `evolution` 等子目录内容仍由 `--evidence` 显式提供。
 
 转换关系：
 

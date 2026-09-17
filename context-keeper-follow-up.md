@@ -4,7 +4,7 @@
 
 ## 0. 状态
 
-本次 follow-up 已全量落地，包含两批 commit：
+本次 follow-up 已全量落地，包含三批 commit：
 
 第一批按 follow-up 第 3 节 3.1–3.7 主体修改（边界收窄、删除 --include-history、
 hook 触发词收紧、合同候选规则、提交前收尾、文档模型与路径兼容、单向写入边界）。
@@ -22,7 +22,28 @@ hook 触发词收紧、合同候选规则、提交前收尾、文档模型与路
   evidence（含不同类型标识/零命中/越界报错）、4.4 新旧路径、4.5 单向
   写入边界。
 
-测试：23 个全过。
+第三批针对 Context Keeper 新版（v0.3.0+ 把默认存储目录从
+`context-keeper/` 改为 `docs/context-keeper/` 且允许 `--store-dir` /
+配置文件任意指定）补充边界：
+- 3.8：`scan` 不再硬编码 context-keeper 候选路径，改为全项目
+  rglob `memory-keeper.md` 作为唯一入口标识。`plans` / `worklogs` /
+  `evolution` 子目录内容由 `--evidence` 显式提供，不在 scan 输出
+  中列举。
+- 4.7：测试覆盖 4 个不同位置的 `memory-keeper.md`（默认、新版默认、
+  用户自定义、旧版 v0.x 路径）都能被 scan 发现。
+
+第四批把 PRD Distill 收窄到项目级 skill：默认对所有项目不生效，
+必须由用户在对话中显式确认启用。
+- 3.9：harvest hook 在 `docs/prd/README.md`（init 创建的启用标记）
+  不存在的项目中直接返回 0，不写 inbox，不创建 `docs/`。`status`
+  命令新增 `prd_distill_enabled` 字段，Agent 在对话中识别触发词时
+  调用 status 确认状态，未启用时主动询问用户。
+- 4.8：测试覆盖未启用项目跳过、显式启用后正常、prd-distill 源码根
+  跳过、`status` 命令报告正确状态。
+- 5.8：原 5.1 隐含覆盖扩展为"未启用项目不主动 init、不主动创建结构、
+  不主动写 inbox；只在用户确认后由 Agent 运行 init"。
+
+测试：28 个全过（第一批 23 + 第三批删除 3 + 新增 2 + 第四批新增 6 = 28）。
 
 未落地的需求：
 - 4.6 合同状态边界：要求 PRD Distill 拒绝从"待验证/已替代" evolution
@@ -289,7 +310,51 @@ PRD Distill 后续仍只能写：
 - `context-keeper/evolution/`
 - 旧版 `docs/plans/`、`docs/worklog/`、`docs/worklogs/` 或 `docs/memory-keeper.md`
 
-如需记录“某条历史经验已正式化”，由 Context Keeper 在自己的后续保存流程中记录 PRD 或合同链接，PRD Distill 不反向修改历史文件。
+如需记录”某条历史经验已正式化”，由 Context Keeper 在自己的后续保存流程中记录 PRD 或合同链接，PRD Distill 不反向修改历史文件。
+
+### 3.8 scan 不假设 context-keeper 存储目录
+
+Context Keeper 新版（v0.3.0+）的存储路径优先级：
+
+1. `--store-dir` 命令行参数
+2. 配置文件 `directory` 字段
+3. `_discovery_candidates` 自动发现
+4. `DEFAULT_STORE = “docs/context-keeper”` 兜底
+
+任何固定路径枚举（”扫 `context-keeper/` 或 `docs/context-keeper/`”）都会漏掉用户自定义位置，与 1.1 独立运行原则冲突。
+
+修改：
+
+- `skills/prd-distill/scripts/prd_distill.py` 的 `cmd_scan` 改为全项目 rglob `memory-keeper.md`。
+- `skills/prd-distill/scripts/prd_distill.py` 删除 `_detect_context_keeper_layout` 和 `_list_context_keeper_files`。
+- `cmd_scan` 不再列举 `plans` / `worklogs` / `evolution` 子目录内容；这些子目录由 `--evidence` 显式提供。
+- `cmd_scan` 输出 `context_keeper.memory_keeper_files`（相对路径列表），覆盖默认路径、新版默认路径、用户自定义路径、旧版 v0.x `docs/memory-keeper.md` 路径。
+- `cmd_scan` 删除 `legacy_history.memory_keeper` 字段（被 `context_keeper.memory_keeper_files` 覆盖）。
+- `ContextKeeperWriteProtectionTests._fingerprint` 不再硬编码 `context-keeper/` 路径，扫描 root 下所有非 PRD / 入口桥接的 .md 指纹，确保不被假设路径绑死。
+
+理由：
+
+- `memory-keeper.md` 是 context-keeper 的统一入口文件名，全项目 rglob 不管目录在哪都能可靠发现。
+- `plans` / `worklogs` / `evolution` 的具体文件由 `--evidence` 显式传入，符合 3.2 的”显式、有限证据输入”原则。
+- PRD Distill 不读取 Context Keeper 配置文件，避免跨 skill 维护成本（配置文件路径和 schema 是 context-keeper 内部细节）。
+
+### 3.9 PRD Distill 收窄为项目级 skill
+
+PRD Distill 不是用户级 skill，是对单个项目生效的工作流。harvest hook 即使用户在全局 Claude Code settings.json 里挂了，也不应对所有项目都生效。
+
+修改：
+
+- `skills/prd-distill/scripts/claude_hooks/harvest_prd_prompt.py` 在 main 开头增加启用检查：`docs/prd/README.md` 不存在时直接返回 0，不创建 `docs/`。
+- `skills/prd-distill/scripts/prd_distill.py` 新增 `cmd_status` 命令，输出 `prd_distill_enabled: bool`，供 Agent 在对话中调用。
+- `skills/prd-distill/SKILL.md` 新增”项目级启用与对话式初始化”章节，明确 Agent 在未启用项目里的标准流程：识别触发词 → 调 `status` → 用对话询问用户 → 用户确认后 `init`。
+- 启用标记只有一个：`docs/prd/README.md`（`init` 创建）。Agent 不引入 `.prd-distill`、`.claude/prd-distill.json` 等隐藏配置。
+- 已启用项目：用户希望关闭时，删除 `docs/prd/README.md` 即可让 hook 重新跳过；Agent 不自动重建。
+
+理由：
+
+- 用户全局挂 hook 时，未启用项目不应被自动创建 `docs/prd/` 或写 inbox，避免污染。
+- 启用决定权交给用户，Agent 不替用户做”这个项目要不要 PRD Distill”的判断。
+- 启用标记用 init 已经创建的 `docs/prd/README.md`，不引入新文件，保持 PRD Distill 内部一致性（check / scan / status 都读这个文件）。
 
 ## 4. 后续测试与验收标准
 

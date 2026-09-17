@@ -79,10 +79,42 @@ def _project_root() -> Path:
     return Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()).resolve()
 
 
+def _is_prd_distill_source_root(root: Path) -> bool:
+    """当前项目根是 prd-distill 自身源码仓库时跳过 hook。
+
+    判定: 项目根同时存在 skills/prd-distill/scripts/prd_distill.py 与
+    tests/test_prd_distill.py, 表明这是 prd-distill 的开发/维护仓库,
+    不应在仓库自身维护 PRD 需求碎片。
+    """
+    return (
+        (root / "skills" / "prd-distill" / "scripts" / "prd_distill.py").exists()
+        and (root / "tests" / "test_prd_distill.py").exists()
+    )
+
+
+def _is_prd_distill_enabled(root: Path) -> bool:
+    """PRD Distill 在该项目已启用 = docs/prd/README.md 存在(init 创建)。
+
+    PRD Distill 是项目级 skill: 默认对所有项目都不生效, hook 不会自动
+    写 inbox。用户通过对话显式确认启用后, `init` 命令创建
+    docs/prd/README.md 等产物, hook 才对该项目开始记录需求碎片。
+    """
+    return (root / "docs" / "prd" / "README.md").exists()
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
     except Exception:
+        return 0
+
+    root = _project_root()
+    # 源码根跳过: 避免开发仓库被自己的 hook 污染
+    if _is_prd_distill_source_root(root):
+        return 0
+    # 项目未启用跳过: 默认不污染任何项目, 由 Agent 在对话中识别
+    # 触发词并询问用户是否启用, 见 SKILL.md "项目级启用与对话式初始化"。
+    if not _is_prd_distill_enabled(root):
         return 0
 
     prompt = _extract_prompt(payload)
@@ -94,7 +126,6 @@ def main() -> int:
     if _is_history_question(prompt):
         return 0
 
-    root = _project_root()
     inbox = root / "docs" / "prd" / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     today = dt.date.today().isoformat()

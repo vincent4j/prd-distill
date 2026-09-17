@@ -13,6 +13,7 @@ description: "把需求碎片、代码变更、历史经验提炼成模块 PRD �
 
 1. **结构定位**
    - 优先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'`，用限量 JSON 确定模块、主 PRD 和合同文件。`lookup` 默认只搜索 `docs/prd/` 与生效合同；不传 `--evidence` 时不读取 `context-keeper/` 或旧版 `docs/plans/`、`docs/worklog/`、`docs/memory-keeper.md`。
+   - `scan` 通过全项目 rglob `memory-keeper.md` 提示 context-keeper 是否存在: 不假设存储目录位置, 用户在 init 时指定的任意目录都能被发现。`plans` / `worklogs` / `evolution` 等子目录内容仍由 `--evidence` 显式提供。
    - 如果脚本不可用，再检索 `docs/prd/README.md` 的命中行：`rg -n -m 20 '<模块|关键词|合同ID>' docs/prd/README.md`。
    - 如果入口不清，先用 `rg --files docs/prd | rg '<模块|关键词|合同ID>'` 或 `rg -l '<关键词>' <高概率目录...>` 找候选文件，不直接打印正文。
 2. **命中收窄**
@@ -66,7 +67,7 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 
 - **提炼 PRD**：运行 `scripts/prd_distill.py scan --root <repo>`；按模块收窄读取；更新模块 PRD 和 `docs/prd/README.md`；运行 `scripts/prd_distill.py check --root <repo>`。需要文档边界时读 `references/doc-model.md`。
 - **整理约束合同**：读取 `references/contract-rules.md`，再处理合同草稿、生效条件、测试绑定和运行证据。
-- **检查实现与文档是否一致**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 返回 `not_initialized` 表示项目尚未启用 PRD Distill，不是结构 warning 或完成证明；返回 `initialized` 时再判断 errors / warnings。脚本只验证结构、草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断。`lookup` 默认不读取 `context-keeper/` 或旧版历史目录；如需消费历史证据，按需从 `context-keeper/` 中定位有限文件再交给 PRD Distill 处理。
+- **检查实现与文档是否一致**：先运行 `scripts/prd_distill.py lookup --root <repo> --query '<模块|关键词|合同ID>'` 定位相关 PRD / 合同，再运行 `scripts/prd_distill.py check --root <repo>`；只在相关时对比生效合同、关联 PRD 章节和当前实现。`check` 返回 `not_initialized` 表示项目尚未启用 PRD Distill，不是结构 warning 或完成证明；返回 `initialized` 时再判断 errors / warnings。脚本只验证结构、草稿和生效合同必备字段；语义一致性必须结合当前实现、运行证据、PRD 和合同判断。`lookup` 默认不读取 `context-keeper/` 或旧版历史目录；如需消费历史证据，按需从 `context-keeper/`（或用户自定义的存储目录）中定位有限文件再交给 PRD Distill 处理。
 - **提交前收尾**：当用户要求提交、保存并提交、推送，或准备运行 `git commit` 时，读取 `references/pre-commit-closeout.md`；提交前默认检查证据与文档收口，不把它理解成重新跑一遍合同测试。
 - **开发前模块入场 / 合同保护**：当用户要求开发已有模块、修 bug、调整模块行为，或提到陌生模块概念时，读取 `references/module-entry-contract-protection.md`。有合同命中才输出清单；无命中用一行说明。
 - **安装、平台差异或 hooks**：只在用户询问或需要安装/排查时读取 `references/platforms.md` 或 `references/claude-code-hooks.md`。
@@ -118,6 +119,28 @@ PRD Distill - 从会话中提炼和萃取出结构化的 PRD
 合同验收：
 - <合同ID>：通过/部分通过/未验证/不适用；证据：<测试/API/DB/日志/截图/DOM/手动说明>
 ```
+
+## 项目级启用与对话式初始化
+
+PRD Distill 是项目级 skill，不对用户全局生效。所有项目默认未启用：harvest hook 不会自动写 inbox，也不会自动创建 `docs/prd/`。一个项目从"未启用"变为"启用"必须由用户在对话中显式确认：
+
+1. **触发识别**：Agent 在用户消息中识别到 PRD 触发词（必须、不能、contract、invariant 等）或者用户主动调用 `/prd-distill`。
+2. **状态检查**：运行 `scripts/prd_distill.py status --root <repo>`。返回 `prd_distill_enabled: false` 表示该项目尚未启用。
+3. **对话式确认**：Agent 用对话询问用户，例：
+
+   ```text
+   检测到本项目尚未启用 PRD Distill。
+   启用后会创建 docs/prd/、docs/prd/contracts/ 等结构，并在之后
+   自动把含触发词的用户消息写入 docs/prd/inbox/。
+   是否在本项目启用 PRD Distill？
+   ```
+
+4. **用户显式确认后**：运行 `scripts/prd_distill.py init --root <repo>`。`init` 会创建 `docs/prd/README.md`（启用标记）、`docs/prd/contracts/README.md`、`docs/prd/inbox/`、`docs/prd/contracts/inbox/`、`AGENTS.md` / `CLAUDE.md` 桥接块。
+5. **启用后**：harvest hook 在该项目中开始生效，含触发词的用户消息才会被写入 `docs/prd/inbox/`。
+6. **不启用时**：Agent 不主动创建任何文件，按"未启用"继续工作；用户消息中的强约束叙述只在本轮对话中作为上下文，不进入 PRD。
+7. **关闭启用**：用户希望关闭时，删除 `docs/prd/README.md` 即可让 hook 重新跳过；Agent 不要再 `init` 或自动重建。
+
+启用标记只有一个：`docs/prd/README.md`（`init` 创建）。Agent 不引入额外的隐藏配置文件，避免给项目增加 PRD Distill 之外的耦合。
 
 ## 硬约束
 

@@ -32,7 +32,7 @@
    - `status: not_initialized`：如果用户明确要启用 PRD Distill，先运行 `init`；否则把 PRD、合同和入口桥接标为 `不适用`，不报告缺索引 warning，也不强行创建结构。
    - `status: initialized`：继续处理 errors / warnings；索引缺失代表已有结构不完整，不能按不适用跳过。
 3. 只在状态为 `initialized` 时运行 `scripts/prd_distill.py scan --root <repo>`，检查待处理的 PRD / 合同 inbox 草稿。
-4. `scan` 只用于发现候选输入。scan 后必须按模块名、文件名、合同 ID 或当前变更路径收窄读取范围；不要因为 scan 看到 `context-keeper/` 或旧版历史目录存在，就全文读取这些文件。
+4. `scan` 只用于发现 PRD / 合同 / inbox 候选输入；scan 后必须按模块名、文件名、合同 ID 或当前变更路径收窄读取范围。`scan` 通过全项目 rglob `memory-keeper.md` 提示 context-keeper 是否存在, 不假设存储目录; 需要具体历史证据时通过 `--evidence` 显式传入。
 5. 按受影响事实面判断哪些现役说法可能过期；如果存在需求碎片、强约束，或会影响 PRD 的实现变更，运行对应动作：
    - 用提炼 PRD 处理模块行为、工作流、字段、验收标准和决策变化。
    - 用整理约束合同处理已经在自测中有测试或运行证据支撑、且需要长期保留的硬约束。
