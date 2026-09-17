@@ -155,10 +155,15 @@ def _list_md(path: Path, base: Path | None = None) -> list[str]:
 
 
 def _detect_context_keeper_layout(root: Path) -> str:
-    """判断 context-keeper 目录的布局:
-    - "new"     只包含新路径(context-keeper/{plans, worklogs, memory-keeper.md, evolution})
-    - "legacy"  只包含旧路径(docs/{plans, worklog, memory-keeper.md})
-    - "missing" 没有任何 context-keeper 内容
+    """判断 context-keeper 与项目根 docs/ 的布局:
+    - "new"     context-keeper/ 下有新路径(memory-keeper.md / plans / worklogs /
+                evolution)至少一个, 且项目根 docs/ 下没有旧路径。
+    - "legacy"  context-keeper/ 下没有新路径, 但项目根 docs/ 下有旧路径
+                (memory-keeper.md / plans / worklog)。
+    - "mixed"   新旧路径同时存在。
+    - "missing" context-keeper/ 不存在, 项目根 docs/ 也没有旧路径。
+
+    参数 root 是 context-keeper/ 目录, 旧路径检查的是 root.parent / "docs"。
     """
     new_layout = (
         (root / "memory-keeper.md").exists()
@@ -166,10 +171,11 @@ def _detect_context_keeper_layout(root: Path) -> str:
         or (root / "worklogs").exists()
         or (root / "evolution").exists()
     )
+    legacy_root = root.parent / "docs"
     legacy_layout = (
-        (root.parent / "docs" / "memory-keeper.md").exists()
-        or (root.parent / "docs" / "plans").exists()
-        or (root.parent / "docs" / "worklog").exists()
+        (legacy_root / "memory-keeper.md").exists()
+        or (legacy_root / "plans").exists()
+        or (legacy_root / "worklog").exists()
     )
     if new_layout and not legacy_layout:
         return "new"

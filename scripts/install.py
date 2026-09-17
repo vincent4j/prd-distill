@@ -33,7 +33,11 @@ def _copy_skill(target_root: Path) -> Path:
     target_root = target_root.expanduser().resolve()
     target = target_root / "prd-distill"
     target_root.mkdir(parents=True, exist_ok=True)
-    if target.exists():
+    # 避免目标已是符号链接(例如开发者把 ~/.claude/skills/prd-distill 链回源码)
+    # 时 shutil.copytree 顺着链接把改动写进源码目录。
+    if target.is_symlink():
+        target.unlink()
+    elif target.exists():
         shutil.rmtree(target)
     shutil.copytree(SOURCE_SKILL, target)
     return target
@@ -101,6 +105,10 @@ def _make_executable(path: Path) -> None:
 def _install_claude_hooks(claude_dir: Path) -> Path:
     claude_dir = claude_dir.expanduser().resolve()
     hooks_dir = claude_dir / "hooks" / "prd-distill"
+    # 同样的保护: hooks_dir 已是符号链接时, 后续 mkdir 是 no-op, shutil.copy2
+    # 会顺着链接把 hook 脚本写进源码目录, 污染本仓库。
+    if hooks_dir.is_symlink():
+        hooks_dir.unlink()
     hooks_dir.mkdir(parents=True, exist_ok=True)
     for name in ("harvest_prd_prompt.py", "guard_prd_commit.py"):
         target = hooks_dir / name
