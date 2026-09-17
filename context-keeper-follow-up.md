@@ -27,7 +27,8 @@ hook 触发词收紧、合同候选规则、提交前收尾、文档模型与路
 未落地的需求：
 - 4.6 合同状态边界：要求 PRD Distill 拒绝从"待验证/已替代" evolution
   经验直接晋升为生效合同。evolution 文件由 context-keeper 维护, 状态
-  字段语义属 context-keeper, 跨 skill 验证依赖双方协议, 本轮未做。
+  字段语义属 context-keeper, 跨 skill 验证依赖双方协议。**用户决定
+  暂不做**：等以后实际触发合同晋升流程、需要这条规则时再补。
 - 5.4 独立运行测试加强：5.1 隐含覆盖（lookup 接受空项目根, scan /
   check 对未初始化项目 not_initialized）。
 
