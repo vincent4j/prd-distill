@@ -1,114 +1,133 @@
-# prd-distill
+<div align="center">
 
-PRD Distill 用来解决一个很常见的问题：你和 AI 明明已经把需求、规则、坑点都说清楚了，但过几天换个会话、换个 agent，它又忘了。
+# 📋 PRD Distill
 
-它是一个面向 Codex 和 Claude Code 的 skill，会把对话里的零散需求、纠正、临时决策和代码变更，提炼成模块 PRD，并把必须长期遵守的规则沉淀为约束合同。
+**为 AI 编程项目自动提炼并维护 PRD，沉淀成项目长期积累的数据资产。**
 
-## 为什么我会做这个 Skill
+过去产品经理要先写 PRD 才能开工，现在 AI 在你开发时自动提炼、自动总结。
 
-用 AI 写一个稍微大一点的应用，最烦的不是让它写代码，而是让它一直记得“以前到底说好了什么”。
+[💡 为什么需要](#为什么需要-prd-distill) · [✨ 能帮你做什么](#能帮你做什么) · [🚀 快速上手](#快速上手) · [📂 项目里会新增什么](#项目里会新增什么)
+[🤖 后续 agent 会怎么用它](#-后续-agent-会怎么用它) · [🤝 与 Context Keeper 配合](#-与-context-keeper-配合) · [🎯 设计理念](#设计理念)
 
-我自己反复遇到的是这三个问题：
+</div>
 
-- 改一个旧模块时，已经想不起当时的详细需求、功能边界和设计原因，只能让 AI 重新读代码、重新研究现状。
-- 之前已经修过、验证过的 bug，因为只留在聊天记录里，后续改功能时又被改回来了。
-- 过去已经纠正过 AI、明确过的规则，比如固定路径、字段来源、失败处理，一段时间后新的 agent 又不遵守了。
+---
 
-PRD Distill 想解决的就是这些问题：不要让重要规则只活在聊天里，也不要让每次开发都重新读代码、重新猜历史。后面的 agent 再改同一个模块时，应该先查模块 PRD 和约束合同，再动代码。
+## 💡 为什么需要 PRD Distill？
 
-## 它做什么
+你用 AI 写代码，是不是也遇到过：
 
-- **提炼模块 PRD**：把当天或近期的碎片需求整理成“这个模块现在应该怎么工作”。
-- **整理约束合同**：把不能回归、必须验证、以后不能再改坏的规则沉淀下来。
-- **写入项目入口规则**：让后续 agent 知道开发前应该先查 PRD / 合同。
-- **提交前收尾**：提醒 agent 把代码、PRD、合同和验证证据一起对齐。
-- **按需消费 `context-keeper` 证据**：通过 `--evidence <file>` 把 `context-keeper/` 下已定位的具体文件作为有限历史证据交给 PRD Distill；命中用 `type: "evidence"` 单独标识，不主动宽扫历史目录。
+- 🔍 改之前写过的模块——大功能点还想起，但具体有哪些小功能点、边界细节、字段校验规则全记不得，只能让 AI 重新读源码反推
+- 💬 提新需求时（"改一下采集逻辑"），需要把和这个需求关联的、已经实现的需求再完整地说一遍——这个模块之前有哪些功能、字段怎么校验、边界是什么、跟别的需求怎么联动；新会话不读上下文，根本不知道从哪下手
+- 📦 边写边加、想到一点改一点，需求散了一地，最后连自己都说不清这个模块的全貌
+- 🐛 上次修过的回归 bug，这次改功能又被改回来了
+- 📜 过去已经纠正过的硬规则（固定路径、字段来源、失败处理），一段时间后新会话接手又不遵守了
 
-`context-keeper` 更像”当天工作记录”，PRD Distill 更像”长期规则整理”。两者互相独立：没有 `context-keeper` 时 PRD Distill 仍能根据当前对话、当前代码和已有产品文档工作；没有 PRD Distill 时 `context-keeper` 仍能保存进度。两者同时存在时，PRD Distill 只在显式提供 `context-keeper/` 下的具体文件时消费其内容，不主动宽扫历史目录。
-
-## 怎么开始用
-
-在 Codex 中输入 `[$prd-distill]`，或在 Claude Code 中输入 `/prd-distill`，然后选择要做的事：提炼 PRD、整理约束合同，或检查实现与文档是否一致。
-
-你也可以直接把任务交给 agent：
+**📦 安装命令：**
 
 ```text
-请使用 PRD Distill 初始化这个项目的 PRD / 合同结构，并写入 AGENTS.md / CLAUDE.md 桥接规则。
+npx skills add vincent4j/prd-distill
 ```
 
-或者在提交前说：
+### ⚡ 在你用之前，你可能想知道
+
+- ⚡ 只对启用了的项目生效——你电脑上其他项目不会被打扰
+- ✍️ 第一次用会问你"PRD Distill 会生成文件，存放在哪个目录？"
+- 📝 只记当前产品应该怎么工作，不存你和 AI 的聊天历史
+- 🤖 Claude Code 会自动记下你说过的"必须""不能"；Codex 和 ChatGPT 没有这个能力，需要你显式告诉 AI 去记
+
+## ✨ 能帮你做什么？
+
+| 痛点 | 它怎么解决 |
+|------|-----------|
+| 改之前写过的模块，细节记不起 | 把模块当前完整功能、边界细节、字段校验都写成 PRD，新会话改前先查 |
+| 提新需求时得跟 AI 说一大通 | 把模块功能、关联需求、字段、边界、校验都沉淀到 PRD 里；提需求时 AI 用 lookup --query 关键词检索 PRD 自己学习，不用每次重复说 |
+| 需求散了一地 | 自动收口到模块目录，定期提炼成 PRD 或合同 |
+| 上次修过的 bug 又被改回来 | 把"必须""不能"做成有测试把关的合同，改代码触发回归就知道 |
+| 硬规则被新会话忘 | 把硬规则（路径、字段来源、失败处理）做成合同，新会话启动时通过入口桥接块先看 |
+
+### 🤖 AI 怎么自动记下你强调的规则？
+
+Claude Code 有个能力：你发消息给它时，它会自动读你说的内容。如果你说"这个字段必须来自权威数据源""以后每个订单都要校验幂等键"，它会自动把这条记到这个项目的收件夹里，之后由你或 AI 提炼成正式 PRD 或合同。
+
+**注意**：这个自动记的能力**只在 Claude Code 里**有。Codex 和 ChatGPT 没有这个能力，你在它们里说的话不会被自动记——你需要主动告诉 AI "把这条记到 PRD 里"。
+
+### ❓ 为什么每个项目都要单独问一次？
+
+PRD Distill 只在"你明确启用过的项目"里工作，不会自作主张地在你电脑上所有项目里建文件。第一次用会先问你"PRD Distill 会生成文件，存放在哪个目录？"——默认是当前目录，你也可以指定别的位置或子目录。
+
+## 🚀 快速上手
+
+输入 `/`，再输入 `prd` 筛选，选择 **`/prd-distill`** 并发送。
+
+第一次 AI 会先问你：
 
 ```text
-请使用 PRD Distill 检查当前实现和模块 PRD / 合同是否一致，提交前把需要收尾的文档一起处理掉。
+PRD Distill 会生成一些文件，存放在哪个目录？
+默认是当前目录，会在 docs/prd/ 下创建 PRD 和合同。同意吗？
+想换其他地方请告诉我完整路径。
 ```
 
-## 安装
+确认后 AI 才会在那个目录里创建 PRD / 合同结构。之后每次用直接出三个选项：
 
-推荐让 agent 帮你安装。把下面这段复制给你正在使用的 Codex / Claude Code / 其他本地 agent，它会拉取仓库、运行安装器并完成校验。
+1. ✍️ 提炼 PRD
+2. 📋 整理约束合同
+3. ✅ 检查实现与文档是否一致
 
-```text
-请帮我在本机安装 PRD Distill。
+## 📂 项目里会新增什么？
 
-要求：
-1. 从 https://github.com/vincent4j/prd-distill 拉取最新代码。
-2. 运行仓库里的 scripts/install.py，安装到本机可用的 Codex / Claude Code skills。
-3. 如果本机有 Claude Code，请同时安装 Claude Code 全局 hooks。
-4. 安装后校验 skill 可用，并告诉我安装到哪些路径。
+在你确认的目录里，会生成这些文件：
+
+```
+你的项目/
+├── CLAUDE.md
+└── docs/
+    └── prd/
+        ├── README.md          # 模块索引
+        └── contracts/
+            └── README.md      # 合同索引
 ```
 
-如果只想安装 skill，不想安装 Claude Code hooks，把第 3 条改成：
+**文件作用：**
 
-```text
-不要安装 Claude Code 全局 hooks，只安装 skill 文件。
-```
+- `docs/prd/`：存这个项目当前有效的 PRD 和合同
+- `docs/prd/README.md`：模块索引。AI 改模块前先查这里
+- `docs/prd/contracts/`：存不能违反的硬规则
+- `CLAUDE.md`：Claude Code 启动入口；AI 只维护这块内容，不会改你的其他规则
 
-手动安装备用：在仓库目录运行 `python3 scripts/install.py`；如果不装 hooks，运行 `python3 scripts/install.py --all --no-claude-hooks`。
+PRD Distill 在你指定的目录里创建这些文件；之后每次用都在这个目录里工作。
 
-## 它会生成什么
+## 🤖 后续 agent 会怎么用它
 
-在项目里，PRD Distill 主要维护这些内容：
+当你提出一个新需求，比如"改一下采集逻辑"或"优化某个模块"时，AI 应该按下面四步走：
 
-- `docs/prd/README.md`：模块索引，告诉后续 agent 去哪里找规则。
-- `docs/prd/<module>.md`：模块 PRD，记录当前有效需求和行为。
-- `docs/prd/contracts/<module>.md`：约束合同，记录不能回归的规则、验证方式和证据要求。
-- `AGENTS.md` / `CLAUDE.md`：很短的桥接规则，让新会话知道开发前要先查 PRD / 合同。
-
-重复运行时，它只更新受控块和 PRD / 合同相关文件，不会改写项目里的其他说明。
-
-## 后续 agent 会怎么用它
-
-当你提出一个新需求，比如“改一下采集逻辑”或“优化某个模块”时，agent 应该先做四件事：
-
-1. 用模块名、业务词、文件名、接口名或错误现象，在 `docs/prd/README.md` 里定位相关模块。
-2. 只读取相关模块 PRD 和约束合同，不全文翻旧聊天、不宽扫整个项目。
-3. 如果新需求和已有规则冲突，先列出冲突点，请你确认。
-4. 改完代码后，按受影响合同跑测试或补充运行证据。
+1. **定位模块**：用模块名、业务词、文件名、接口名或错误现象在 `docs/prd/README.md` 里搜相关模块；只看命中行，不全文翻。
+2. **只读相关**：只读命中的模块 PRD 和约束合同，不宽扫整个项目；上下文不足或跨模块改动时再扩大。
+3. **冲突先确认**：如果新需求和已有合同冲突，先列出冲突点和受影响合同，请你确认；不要替用户做规则变更决定。
+4. **改完按合同跑测试**：按受影响合同跑测试或补充运行证据；UI / UX 合同要保存截图或 DOM 证据。
 
 这就是 PRD Distill 真正想提供的价值：让后续 agent 不靠猜、不靠临时记忆，而是按项目里已经沉淀下来的规则继续开发。
 
-## 与 `context-keeper` 配合
+## 🤝 与 Context Keeper 配合
 
-PRD Distill 与 `context-keeper` 互相独立。`context-keeper/` 下的 plan、worklog、memory、evolution 不会被 PRD Distill 默认读取；只有显式传入 `--evidence` 时才会消费对应文件。
+PRD Distill 和 Context Keeper 都是独立 skill，可以分开装、分开用，没有依赖关系：
 
-典型用法：
+- **没装 [Context Keeper](https://github.com/vincent4j/context-keeper)**：PRD Distill 仍能根据当前会话、当前代码和已有产品文档提炼并维护 PRD。
+- **没装 PRD Distill**：[Context Keeper](https://github.com/vincent4j/context-keeper) 仍能保存历史事实供你和 AI 用。
+- **两个都装了**：[Context Keeper](https://github.com/vincent4j/context-keeper) 把已经定位好的历史片段作为有限证据交给 PRD Distill，PRD Distill 据此判断是否要更新 PRD 或提炼出合同——这是可选搭配，不存在"必须配合"的硬关系。
 
-```bash
-# 默认: 只搜当前 PRD 和合同
-python3 skills/prd-distill/scripts/prd_distill.py lookup \
-  --root <repo> --query '<关键词>'
+典型场景：
 
-# 需要把 context-keeper 已定位的历史文件作为有限证据
-python3 skills/prd-distill/scripts/prd_distill.py lookup \
-  --root <repo> --query '<关键词>' \
-  --evidence context-keeper/plans/2026-09-17-主题.md \
-  --evidence context-keeper/memory-keeper.md
-```
+- "上次为什么放弃这条路线？" → 只查 [Context Keeper](https://github.com/vincent4j/context-keeper)
+- "现在允许使用哪些路线？" → 只查 PRD Distill 的当前 PRD
+- "把上次教训变成以后必须遵守的规则" → Context Keeper 给证据，PRD Distill 判断是否形成合同
 
-`--evidence` 文件不存在、不是文件或不在项目根下时立即报错，不会偷偷扩大搜索范围；evidence 命中用 `type: "evidence"` 单独标识，与当前 PRD/合同命中分开。零命中不报错也不回退。
+PRD Distill 默认不读 Context Keeper 的目录；只有在显式提供具体文件作为证据时才读，不会主动宽扫历史。Context Keeper 的存储目录也由用户自己决定，PRD Distill 不假设位置——你需要自己把要参考的那份历史文件指给 PRD Distill。
 
-## Codex 和 Claude Code 的区别
+## 🎯 设计理念
 
-- **Codex**：可以手动触发 `[$prd-distill]`，也可以在提交前让 agent 主动收尾。
-- **Claude Code**：除了手动触发 `/prd-distill`，还可以通过全局 hooks 自动收集强需求片段，并在 `git commit` 前拦截未收尾的 PRD / 合同草稿。
-
-所以，如果你主要用 Claude Code，建议完整安装 hooks；如果你主要用 Codex，只安装 skill 也能覆盖主要工作流。
+- **项目级生效**：默认所有项目不启用，启用决定由你在对话中显式确认
+- **存当前规格，不存历史**：聊天记录是 Context Keeper 的事；PRD 只写模块当前应该怎么工作
+- **合同是完成标准**：有合同命中就逐项报告通过 / 未验证 / 不适用；没匹配证据不能宣称完成
+- **不污染用户**：PRD Distill 只写它自己生成的目录和入口文件，不写你电脑上的其他目录
+- **保持轻量**：用 Markdown 文件，按项目隔离，不引入数据库或后台服务
