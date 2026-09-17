@@ -22,6 +22,7 @@ PRD Distill 想解决的就是这些问题：不要让重要规则只活在聊�
 - **整理约束合同**：把不能回归、必须验证、以后不能再改坏的规则沉淀下来。
 - **写入项目入口规则**：让后续 agent 知道开发前应该先查 PRD / 合同。
 - **提交前收尾**：提醒 agent 把代码、PRD、合同和验证证据一起对齐。
+- **按需消费 `context-keeper` 证据**：通过 `--evidence <file>` 把 `context-keeper/` 下已定位的具体文件作为有限历史证据交给 PRD Distill；命中用 `type: "evidence"` 单独标识，不主动宽扫历史目录。
 
 `context-keeper` 更像”当天工作记录”，PRD Distill 更像”长期规则整理”。两者互相独立：没有 `context-keeper` 时 PRD Distill 仍能根据当前对话、当前代码和已有产品文档工作；没有 PRD Distill 时 `context-keeper` 仍能保存进度。两者同时存在时，PRD Distill 只在显式提供 `context-keeper/` 下的具体文件时消费其内容，不主动宽扫历史目录。
 
@@ -84,6 +85,26 @@ PRD Distill 想解决的就是这些问题：不要让重要规则只活在聊�
 4. 改完代码后，按受影响合同跑测试或补充运行证据。
 
 这就是 PRD Distill 真正想提供的价值：让后续 agent 不靠猜、不靠临时记忆，而是按项目里已经沉淀下来的规则继续开发。
+
+## 与 `context-keeper` 配合
+
+PRD Distill 与 `context-keeper` 互相独立。`context-keeper/` 下的 plan、worklog、memory、evolution 不会被 PRD Distill 默认读取；只有显式传入 `--evidence` 时才会消费对应文件。
+
+典型用法：
+
+```bash
+# 默认: 只搜当前 PRD 和合同
+python3 skills/prd-distill/scripts/prd_distill.py lookup \
+  --root <repo> --query '<关键词>'
+
+# 需要把 context-keeper 已定位的历史文件作为有限证据
+python3 skills/prd-distill/scripts/prd_distill.py lookup \
+  --root <repo> --query '<关键词>' \
+  --evidence context-keeper/plans/2026-09-17-主题.md \
+  --evidence context-keeper/memory-keeper.md
+```
+
+`--evidence` 文件不存在、不是文件或不在项目根下时立即报错，不会偷偷扩大搜索范围；evidence 命中用 `type: "evidence"` 单独标识，与当前 PRD/合同命中分开。零命中不报错也不回退。
 
 ## Codex 和 Claude Code 的区别
 
