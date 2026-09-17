@@ -4,7 +4,32 @@
 
 ## 0. 状态
 
-本次 follow-up 已全量落地（按 follow-up 第 3 节 7 项）。落地清单见仓库单次 commit，commit message 显式标注 3.1–3.7 各点的对应修改。本节作为完成标记保留。
+本次 follow-up 已全量落地，包含两批 commit：
+
+第一批按 follow-up 第 3 节 3.1–3.7 主体修改（边界收窄、删除 --include-history、
+hook 触发词收紧、合同候选规则、提交前收尾、文档模型与路径兼容、单向写入边界）。
+该 commit message 显式标注 3.1–3.7 各点的对应修改。
+
+第二批补齐 follow-up 第 4 节验收标准与第 5 节完成定义：
+- 3.2 第 3–5 条：新增 `--evidence <file>` 显式参数（可重复）。evidence 命中
+  在 lookup 输出中用 `type: "evidence"` 单独标识；文件不存在或越界时
+  给清晰错误；零命中不扩大搜索。
+- 3.3 末尾：harvest hook 见到"之前解决过/又复现/上次怎么/上次遗漏"等
+  历史词时整体不写 inbox；混合消息由 Agent 显式提炼。
+- 4.5 / 5.5：新增 `ContextKeeperWriteProtectionTests`，跑遍 PRD Distill
+  所有命令与 harvest hook，断言 `context-keeper/` 下任何文件指纹不变。
+- 5.7：测试覆盖 4.1 独立运行、4.2 纯历史消息、混合消息抑制、有限
+  evidence（含不同类型标识/零命中/越界报错）、4.4 新旧路径、4.5 单向
+  写入边界。
+
+测试：23 个全过。
+
+未落地的需求：
+- 4.6 合同状态边界：要求 PRD Distill 拒绝从"待验证/已替代" evolution
+  经验直接晋升为生效合同。evolution 文件由 context-keeper 维护, 状态
+  字段语义属 context-keeper, 跨 skill 验证依赖双方协议, 本轮未做。
+- 5.4 独立运行测试加强：5.1 隐含覆盖（lookup 接受空项目根, scan /
+  check 对未初始化项目 not_initialized）。
 
 ## 1. 已确认的职责边界
 

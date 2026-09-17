@@ -289,10 +289,35 @@ def _clip(text: str, limit: int = 240) -> str:
     return text[: limit - 1].rstrip() + "…"
 
 
-def _collect_lookup_candidates(root: Path) -> list[Path]:
+def _validate_evidence(evidence_files: list[str], root: Path) -> list[Path]:
+    """校验 --evidence 显式传入的文件:
+    必须是项目根下的现有文件。返回绝对路径列表。
+
+    校验失败时给出明确错误, 不自动扩大搜索范围。
+    """
+    validated: list[Path] = []
+    for raw in evidence_files:
+        path = Path(raw).expanduser().resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            raise SystemExit(
+                f"error: evidence {raw} 超出项目根 {root}"
+            )
+        if not path.exists():
+            raise SystemExit(f"error: evidence {raw} 不存在")
+        if not path.is_file():
+            raise SystemExit(f"error: evidence {raw} 不是文件")
+        validated.append(path)
+    return validated
+
+
+def _collect_lookup_candidates(
+    root: Path, evidence_paths: list[Path]
+) -> list[Path]:
     """默认且始终只搜索 docs/prd/ 与生效合同。
-    历史证据不在候选列表中, 必须由调用方通过其他方式(如 context-keeper)
-    显式定位具体文件, 再交给 PRD Distill 处理。
+    evidence_paths 由 --evidence 显式传入, 必须已通过 _validate_evidence 验证。
+    不在候选列表中默认包含 context-keeper/ 或旧版历史目录。
     """
     candidates: list[Path] = []
     prd = root / "docs" / "prd"
@@ -306,6 +331,7 @@ def _collect_lookup_candidates(root: Path) -> list[Path]:
     ):
         if path.exists():
             candidates.append(path)
+    candidates.extend(evidence_paths)
     return candidates
 
 
@@ -321,11 +347,13 @@ def _line_hits(path: Path, pattern: re.Pattern[str], limit: int) -> list[dict[st
 
 def cmd_lookup(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
+    evidence_paths = _validate_evidence(args.evidence or [], root)
+    evidence_set = {str(path.relative_to(root)) for path in evidence_paths}
     pattern = _compile_query(args.query)
     searched: list[str] = []
     records: list[dict[str, object]] = []
 
-    for path in _collect_lookup_candidates(root):
+    for path in _collect_lookup_candidates(root, evidence_paths):
         try:
             rel = str(path.relative_to(root))
         except ValueError:
@@ -339,11 +367,14 @@ def cmd_lookup(args: argparse.Namespace) -> int:
             score += 100
         if pattern.search(rel):
             score += 20
-        records.append({"file": rel, "hits": hits, "_score": score})
+        record_type = "evidence" if rel in evidence_set else "prd_or_contract"
+        records.append(
+            {"file": rel, "type": record_type, "hits": hits, "_score": score}
+        )
 
     records.sort(key=lambda item: (-int(item["_score"]), str(item["file"])))
     matches = [
-        {"file": item["file"], "hits": item["hits"]}
+        {"file": item["file"], "type": item["type"], "hits": item["hits"]}
         for item in records[: args.max_files]
     ]
 
@@ -353,6 +384,7 @@ def cmd_lookup(args: argparse.Namespace) -> int:
         "searched_files": len(searched),
         "max_files": args.max_files,
         "max_matches_per_file": args.max_matches_per_file,
+        "evidence_files": sorted(evidence_set),
         "truncated": len(records) > args.max_files,
         "matches": matches,
     }, ensure_ascii=False, indent=2))
@@ -426,6 +458,12 @@ def build_parser() -> argparse.ArgumentParser:
     lookup.add_argument("--query", required=True)
     lookup.add_argument("--max-files", type=int, default=3)
     lookup.add_argument("--max-matches-per-file", type=int, default=8)
+    lookup.add_argument(
+        "--evidence",
+        action="append",
+        default=[],
+        help="显式传入 context-keeper 已定位的具体文件路径, 可重复; 仅读取这些文件的命中片段",
+    )
     lookup.set_defaults(func=cmd_lookup)
 
     new_contract = sub.add_parser("new-contract", help="创建合同草稿")

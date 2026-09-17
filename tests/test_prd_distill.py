@@ -163,6 +163,160 @@ class LookupCommandTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unrecognized arguments", result.stderr)
 
+    def test_lookup_evidence_marks_match_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ck = root / "context-keeper" / "plans"
+            ck.mkdir(parents=True)
+            evidence = ck / "context-keeper-命中关键词.md"
+            evidence.write_text("## 用户需求\n\n命中关键词\n", encoding="utf-8")
+            result = _run(
+                ["lookup", "--query", "命中关键词",
+                 "--evidence", str(evidence)],
+                root,
+            )
+        self.assertEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        types = {m["file"]: m["type"] for m in payload["matches"]}
+        self.assertEqual(
+            types.get("context-keeper/plans/context-keeper-命中关键词.md"),
+            "evidence",
+        )
+        self.assertEqual(
+            payload["evidence_files"],
+            ["context-keeper/plans/context-keeper-命中关键词.md"],
+        )
+
+    def test_lookup_evidence_accepts_multiple_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plans = root / "context-keeper" / "plans"
+            plans.mkdir(parents=True)
+            a = plans / "a.md"
+            b = plans / "b.md"
+            a.write_text("# a 命中关键词\n", encoding="utf-8")
+            b.write_text("# b 命中关键词\n", encoding="utf-8")
+            result = _run(
+                ["lookup", "--query", "命中关键词",
+                 "--evidence", str(a), "--evidence", str(b)],
+                root,
+            )
+        self.assertEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            sorted(payload["evidence_files"]),
+            ["context-keeper/plans/a.md", "context-keeper/plans/b.md"],
+        )
+        types = {m["file"]: m["type"] for m in payload["matches"]}
+        for name in ("context-keeper/plans/a.md", "context-keeper/plans/b.md"):
+            self.assertEqual(types.get(name), "evidence")
+
+    def test_lookup_evidence_missing_file_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing = root / "no-such.md"
+            result = _run(
+                ["lookup", "--query", "x", "--evidence", str(missing)], root
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("不存在", result.stderr)
+
+    def test_lookup_evidence_outside_project_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as project_root, \
+                tempfile.TemporaryDirectory() as outside_dir:
+            outside = Path(outside_dir) / "outside.md"
+            outside.write_text("x", encoding="utf-8")
+            result = _run(
+                ["lookup", "--query", "x", "--evidence", str(outside)],
+                Path(project_root),
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("超出项目根", result.stderr)
+
+    def test_lookup_evidence_zero_hits_returns_no_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plans = root / "context-keeper" / "plans"
+            plans.mkdir(parents=True)
+            empty = plans / "empty.md"
+            empty.write_text("# no relevant terms here\n", encoding="utf-8")
+            result = _run(
+                ["lookup", "--query", "不存在的关键词",
+                 "--evidence", str(empty)],
+                root,
+            )
+        self.assertEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["matches"], [])
+
+
+class ContextKeeperWriteProtectionTests(unittest.TestCase):
+    """follow-up 4.5 / 5.5: PRD Distill 任何命令和 hook 都不得修改 context-keeper/。
+    跑遍 init/scan/lookup/check/new-contract/pending/install-bridge 与
+    harvest hook, 断言 context-keeper/ 下任何文件指纹不变。
+    """
+
+    HOOK = SCRIPT.parent / "claude_hooks" / "harvest_prd_prompt.py"
+
+    def _fingerprint(self, root: Path) -> dict[str, str]:
+        ck = root / "context-keeper"
+        if not ck.exists():
+            return {}
+        return {
+            str(p.relative_to(ck)): p.read_bytes().decode("utf-8", errors="replace")
+            for p in sorted(ck.rglob("*.md"))
+        }
+
+    def test_all_commands_and_hooks_leave_context_keeper_untouched(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ck = root / "context-keeper"
+            (ck / "plans").mkdir(parents=True)
+            (ck / "worklogs").mkdir(parents=True)
+            (ck / "memory-keeper.md").write_text(
+                "# memory\n\n历史经验: 必须检查幂等键\n", encoding="utf-8"
+            )
+            (ck / "plans" / "2026-09-17-示例.md").write_text(
+                "# plan\n用户要求: 字段必须来自权威数据源\n", encoding="utf-8"
+            )
+
+            before = self._fingerprint(root)
+            self.assertNotEqual(before, {})
+
+            commands: list[list[str]] = [
+                ["init", "--root", str(root)],
+                ["install-bridge", "--root", str(root)],
+                ["scan", "--root", str(root)],
+                ["lookup", "--root", str(root), "--query", "必须",
+                 "--evidence", str(ck / "memory-keeper.md")],
+                ["check", "--root", str(root)],
+                ["new-contract", "--root", str(root),
+                 "--module", "test", "--title", "示例合同",
+                 "--contract", "必须"],
+                ["pending", "--root", str(root)],
+            ]
+            for cmd in commands:
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), *cmd],
+                    capture_output=True, text=True, check=False,
+                )
+                self.assertEqual(
+                    result.returncode, 0,
+                    f"command {cmd[0]} failed: {result.stderr}",
+                )
+
+            hook_payload = json.dumps({"prompt": "这个字段必须来自权威数据源"})
+            hook_result = subprocess.run(
+                [sys.executable, str(self.HOOK)],
+                input=hook_payload,
+                capture_output=True, text=True, check=False,
+                env={"CLAUDE_PROJECT_DIR": str(root)},
+            )
+            self.assertEqual(hook_result.returncode, 0, hook_result.stderr)
+
+            after = self._fingerprint(root)
+            self.assertEqual(before, after)
+
 
 if __name__ == "__main__":
     unittest.main()

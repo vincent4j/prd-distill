@@ -29,6 +29,29 @@ TRIGGERS = [
 ]
 
 
+HISTORY_HINTS = (
+    "之前解决过",
+    "以前解决过",
+    "又复现",
+    "我记得之前",
+    "查一下上次",
+    "上次怎么",
+    "上次为什么",
+    "上次遗漏",
+    "上次出现",
+    "上次遇到",
+    "上回怎么",
+    "上回为什么",
+    "上回遗漏",
+    "上回出现",
+    "上回遇到",
+)
+
+
+def _is_history_question(text: str) -> bool:
+    return any(hint in text for hint in HISTORY_HINTS)
+
+
 def _extract_prompt(payload: object) -> str:
     if isinstance(payload, dict):
         for key in ("prompt", "message", "user_prompt", "text", "content"):
@@ -65,6 +88,10 @@ def main() -> int:
     prompt = _extract_prompt(payload)
     hits = _hits(prompt)
     if not prompt or not hits:
+        return 0
+    # 出现历史叙述词时整体不写, 避免把"上次怎么处理的""又复现了"等纯历史
+    # 追问误当成需求收进 inbox; 含新增要求的混合消息由 Agent 显式提炼。
+    if _is_history_question(prompt):
         return 0
 
     root = _project_root()
